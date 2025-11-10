@@ -2,7 +2,8 @@
 #include "traffic_density.hpp"
 
 int main() {
-    cv::Mat frame = cv::imread("images/sample.jpg");
+    cv::Mat frame = cv::imread("../resources/images/gemini_sec_cam_traffic-2.png");
+     // gemini_sec_cam_traffic-2.png
     if (frame.empty()) {
         std::cerr << "Error: Could not load image." << std::endl;
         return -1;
