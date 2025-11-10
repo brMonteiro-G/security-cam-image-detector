@@ -3,6 +3,7 @@
 #include <chrono>
 #include <thread>
 
+
 TrafficDensity::TrafficDensity(double threshold) : threshold_(threshold) {}
 
 using namespace std::chrono_literals;
@@ -38,23 +39,24 @@ void TrafficDensity::analyzeFrame(const cv::Mat& frame) {
 
 
     cv::Mat maskROI = cv::Mat::zeros(frame.size(), CV_8UC1);
-
-    // Define polygon points that roughly outline the road area
-    std::vector<cv::Point> roadPts = {
-        cv::Point(150, 400),
-        cv::Point(1100, 400),
-        cv::Point(1280, 720),
-        cv::Point(0, 720)
-    };
-
-    // Fill the polygon white in the mask
-    cv::fillPoly(maskROI, std::vector<std::vector<cv::Point>>{roadPts}, cv::Scalar(255));
-
-    // Apply it to your threshold mask before finding contours
-    cv::bitwise_and(mask, maskROI, mask);
-
-
     cv::Mat hsv, mask, debugFrame;
+
+
+    // // Define polygon points that roughly outline the road area
+    // std::vector<cv::Point> roadPts = {
+    //     cv::Point(150, 400),
+    //     cv::Point(1100, 400),
+    //     cv::Point(1280, 720),
+    //     cv::Point(0, 720)
+    // };
+
+    // // Fill the polygon white in the mask
+    // cv::fillPoly(maskROI, std::vector<std::vector<cv::Point>>{roadPts}, cv::Scalar(255));
+
+    // // Apply it to your threshold mask before finding contours
+    // cv::bitwise_and(mask, maskROI, mask);
+
+
     frame.copyTo(debugFrame);
 
     cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
@@ -80,6 +82,8 @@ void TrafficDensity::analyzeFrame(const cv::Mat& frame) {
     // --- 🪟 Display results ---
     //cv::imshow("Original Frame", frame);
     //cv::imshow("Threshold Mask", mask);
+    drawDebugGrid(frame);
+
     cv::imshow("Detected Vehicles", debugFrame);
 
     std::cout << "Estimated density: " << density << std::endl;
