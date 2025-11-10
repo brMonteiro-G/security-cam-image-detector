@@ -8,6 +8,7 @@ public:
     TrafficDensity(double threshold);
     double computeDensity(const cv::Mat& frame);
     void analyzeFrame(const cv::Mat& frame);
+    void drawDebugGrid(cv::Mat& frame, int step = 100);
 
 private:
     double threshold_;
