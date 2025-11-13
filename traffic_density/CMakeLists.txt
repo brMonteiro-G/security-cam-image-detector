@@ -10,8 +10,11 @@ if (WIN32)
 endif()
 
 find_package(OpenCV REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 
 include_directories(${OpenCV_INCLUDE_DIRS} include)
 
-add_executable(traffic_density src/main.cpp src/traffic_density.cpp)
-target_link_libraries(traffic_density ${OpenCV_LIBS})
+add_executable(traffic_density src/traffic_density.cpp)
+target_link_libraries(traffic_density ${OpenCV_LIBS} nlohmann_json::nlohmann_json)
+
