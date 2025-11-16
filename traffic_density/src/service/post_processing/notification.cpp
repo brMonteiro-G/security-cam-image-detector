@@ -24,12 +24,13 @@ std::string getFormattedTimestamp() {
 
 // === Send SNS Notification ===
 bool sendTrafficNotification(const std::string& avenueName,
-                             const std::string& report,
-                             const std::string& snsTopicArn) {
+                             const std::string& report) {
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     {
         Aws::SNS::SNSClient snsClient;
+
+        const std::string& snsTopicArn = "arn:aws:sns:YOUR_REGION:YOUR_ACCOUNT_ID:YOUR_TOPIC"; // add my SNS topic ARN here
 
         std::string subject = "🚦 Heavy Traffic Alert";
         std::stringstream message;
@@ -61,12 +62,4 @@ bool sendTrafficNotification(const std::string& avenueName,
     return false;
 }
 
-// === Example Usage (can be called from main.cpp) ===
-// int main() {
-//     std::string avenue = "Avenida dos Estados";
-//     std::string report = "Vehicle Count: 18\nTraffic Density: 0.21 (above threshold)";
-//     std::string topicArn = "arn:aws:sns:us-east-1:123456789012:TrafficAlerts";
-//
-//     sendTrafficNotification(avenue, report, topicArn);
-//     return 0;
-// }
+
