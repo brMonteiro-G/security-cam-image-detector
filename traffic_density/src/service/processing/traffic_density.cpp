@@ -78,24 +78,7 @@ string getTimestamp() {
     return ss.str();
 }
 
-// === Save JSON Report ===
-void saveReportJSON(int vehicleCount, double density, const string& condition) {
-    json report;
-    report["timestamp"] = getTimestamp();
-    report["vehicle_count"] = vehicleCount;
-    report["traffic_density"] = density;
-    report["condition"] = condition;
 
-    string filename = "traffic_report_" + getTimestamp() + ".json";
-    ofstream file(filename);
-    if (file.is_open()) {
-        file << setw(4) << report;
-        file.close();
-        cout << "📝 Report saved to: " << filename << endl;
-    } else {
-        cerr << "❌ Failed to save JSON report!" << endl;
-    }
-}
 
 int main() {
     // Load YOLO model
@@ -172,8 +155,7 @@ int main() {
     double density = densityAnalyzer.computeDensity(finalBoxes, image);
     string condition = densityAnalyzer.analyzeDensity(density);
 
-    // Save JSON report
-    saveReportJSON(vehicleCount, density, condition);
+    const report = vehicleCount + " vehicles detected with density " + to_string(density) + ". Condition: " + condition;
 
     // Draw results
     for (size_t i = 0; i < indexes.size(); i++) {
@@ -189,5 +171,5 @@ int main() {
     waitKey(0);
     destroyAllWindows();
 
-    return 0;
+    return {report};
 }
