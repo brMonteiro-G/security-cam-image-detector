@@ -1,13 +1,46 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <filesystem>
+#include <vector>
 
 // ----------------------------------------------------
 // DEMO version of image_capture
 // ----------------------------------------------------
 std::pair<std::string, std::string> image_capture_demo() {
     std::cout << "[DEMO] Simulating image capture...\n";
-    // Fake demo image data generation here
+
+    // Generator-like function that returns an image from the folder every
+    // time it is called. When done it loops to the beginning, keeping the demo
+    // running with only a few images
+
+    static std::vector<std::filesystem::path> files;
+    static size_t index = 0;
+
+    // Load files only once
+    if (files.empty()) {
+        std::string folder = "./resources/images/demo";
+        for (const auto& entry : std::filesystem::directory_iterator(folder)) {
+            if (entry.is_regular_file())
+                files.push_back(entry.path());
+        }
+    }
+
+    if (files.empty()) {
+        return { "NoFiles", "" };
+    }
+
+    // Get the current file
+    const auto& path = files[index];
+
+    // Move to next, wrap around
+    index = (index + 1) % files.size();
+
+    // Generate static name (ex: use filename without extension)
+    std::string avenueName = "Avenida dos Estados";
+
+    return { avenueName, path.string() };
+
 }
 
 // ----------------------------------------------------
@@ -17,6 +50,13 @@ std::pair<std::string, std::string> image_capture_live() {
     std::cout << "[LIVE] Capturing real image from camera...\n";
     // Actual camera capture code here
     return ingest_camera()
+}
+
+// ----------------------------------------------------
+// Flow Control helper function
+// ----------------------------------------------------
+bool userRequestedExit() {
+    return std::cin.rdbuf()->in_avail() > 0;
 }
 
 // ----------------------------------------------------
@@ -39,13 +79,29 @@ int main(int argc, char* argv[]) {
     if (mode == "demo") {
         while (true) {
             auto [avenueName, imagePath] = image_capture_demo();
+
+            if (imagePath.empty()) {
+                std::cout << "No more demo images. Exiting demo mode.\n";
+                break;
+            }
+
             auto [report] = analyzeTrafficDensity();
+
             sendTrafficNotification(
                 avenueName,
-                report,
+                report
             );
 
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            // Wait 5 seconds, exit early if user presses ENTER
+            for (int i = 0; i < 50; ++i) {
+                if (userRequestedExit()) {
+                    std::string line;
+                    std::getline(std::cin, line); // consume input
+                    std::cout << "Exiting demo mode...\n";
+                    return 0; // or break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
         }
     }
 
@@ -58,7 +114,16 @@ int main(int argc, char* argv[]) {
                 report,
             );
 
-            std::this_thread::sleep_for(std::chrono::seconds(36));
+            // Wait 36 seconds for camera to get back into position, exit early if user presses ENTER
+            for (int i = 0; i < 360; ++i) {
+                if (userRequestedExit()) {
+                    std::string line;
+                    std::getline(std::cin, line); // consume input
+                    std::cout << "Exiting demo mode...\n";
+                    return 0; // or break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
         }
     }
     else {
