@@ -4,6 +4,9 @@
 void analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
 
 int main() {
+    
+    // preprocess_static("../../resources/images/gemini_sec_cam_traffic.png"); 
+
 	auto [avenueName, imagePath] = ingest_camera();
     auto [report] = analyzeTrafficDensity(imagePath, avenueName);
 
