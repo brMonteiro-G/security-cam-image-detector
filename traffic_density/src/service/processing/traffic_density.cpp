@@ -80,12 +80,14 @@ string getTimestamp() {
 // =================================================================
 string analyzeTrafficDensity(const string& imagePath)
 {
+    printf("Analyzing traffic density for image at %s\n", imagePath.c_str());
     // Load YOLO
-    Net net = readNet("../resources/models/yolov3.weights",
-                      "../resources/models/yolov3.cfg");
+    Net net = readNet("../../../resources/models/yolov3.weights",
+                      "../../../resources/models/yolov3.cfg");
 
     set<int> vehicleClassIds = {2, 3, 5, 7};
 
+    printf("YOLO model loaded.\n");
     // Load image
     Mat image = imread(imagePath);
     if (image.empty()) {
@@ -95,6 +97,8 @@ string analyzeTrafficDensity(const string& imagePath)
     int height = image.rows;
     int width = image.cols;
 
+
+    printf("Preparing input blob for YOLO.\n");
     // Prepare input
     Mat blob;
     blobFromImage(image, blob, 0.00392, Size(416, 416),

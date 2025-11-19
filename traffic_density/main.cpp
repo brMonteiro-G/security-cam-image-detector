@@ -68,6 +68,7 @@ bool userRequestedExit() {
     return std::cin.rdbuf()->in_avail() > 0;
 }
 
+
 // ----------------------------------------------------
 // Forward declaration (to be implemented in traffic_density.cpp)
 std::string analyzeTrafficDensity(const std::string& imagePath);
@@ -126,7 +127,9 @@ int main(int argc, char* argv[]) {
     else if (mode == "live") {
         while (true) {
             auto [avenueName, imagePath] = image_capture_live();
+            printf("Captured image for %s at %s\n", avenueName.c_str(), imagePath.c_str());
             std::string processedImagePath = test_static_image(imagePath, avenueName);
+            
             std::string report = analyzeTrafficDensity(processedImagePath);
             sendTrafficNotification(
                 avenueName,

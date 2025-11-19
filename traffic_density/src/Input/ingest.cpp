@@ -77,6 +77,9 @@ std::pair<std::string, std::string> ingest_camera() {
     cv::imwrite(filename, frame);
     std::cout << "Captured: " << filename << "\n";
 
+    printf("Captured image for %s at %s\n", avenue_name.c_str(), filename.c_str());
     cap.release();
+    printf("after release\n");
+
     return {avenue_name, filename};
 }
