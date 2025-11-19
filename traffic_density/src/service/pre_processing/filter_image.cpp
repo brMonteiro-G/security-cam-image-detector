@@ -43,31 +43,27 @@ Mat apply_roi(const Mat& frame, double start_ratio = 0.30) {
 // 1️⃣ Static image pipeline
 // ======================================================
 
-Mat preprocess_static(const Mat& frame) {
+// RETURNS STRING (PATH)
+// RECEIVES AVENUE NAME
+string preprocess_static(const Mat& frame, const string& avenue_name) {
     Mat result = apply_clahe_hsv(frame);
     result = apply_bilateral_filter(result);
-    // result = apply_roi(result); // Uncomment if ROI is needed
+    // result = apply_roi(result); // Uncomment if needed
 
-
-
- // Timestamp (epoch seconds)
     long timestamp = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
-    // Ensure output directory exists
     string output_dir = "./resources/images/";
     filesystem::create_directories(output_dir);
 
-    // Build filename
     ostringstream filename;
     filename << output_dir
              << "filtered_image_"
-             << avenue_name << "_" // I need to receive it as a parameter
+             << avenue_name << "_"
              << timestamp
              << ".png";
 
     string path = filename.str();
 
-    // Save image
     imwrite(path, result);
 
     return path;
@@ -77,26 +73,27 @@ Mat preprocess_static(const Mat& frame) {
 // 2️⃣ Test static image from resources
 // ======================================================
 
-void test_static_image(const string& image_path) {
+string test_static_image(const string& image_path, const string& avenue_name) {
     if (!filesystem::exists(image_path)) {
         cout << "Image not found: " << image_path << endl;
-        return;
+        return "";
     }
 
     Mat frame = imread(image_path);
     if (frame.empty()) {
         cout << "Failed to load image: " << image_path << endl;
-        return;
+        return "";
     }
 
-    Mat processed = preprocess_static(frame);
+    string saved_path = preprocess_static(frame, avenue_name);
 
     // Side-by-side display (equivalent of np.hstack)
+    Mat processed = imread(saved_path);
     Mat combined;
     hconcat(frame, processed, combined);
 
     imshow("Original | Processed", combined);
-    cout << "Press any key to close the window." << endl;
-    waitKey(0);
-    destroyAllWindows();
+    waitKey(1);
+
+    return saved_path;
 }

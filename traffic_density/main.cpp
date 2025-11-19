@@ -3,6 +3,15 @@
 #include <algorithm>
 #include <filesystem>
 #include <vector>
+#include <thread>
+#include <chrono>
+
+
+#include <utility>
+
+// Image capture
+std::pair<std::string, std::string> ingest_camera();
+std::string test_static_image(const std::string& imagePath, const std::string& avenueName);
 
 // ----------------------------------------------------
 // DEMO version of image_capture
@@ -49,7 +58,7 @@ std::pair<std::string, std::string> image_capture_demo() {
 std::pair<std::string, std::string> image_capture_live() {
     std::cout << "[LIVE] Capturing real image from camera...\n";
     // Actual camera capture code here
-    return ingest_camera()
+    return ingest_camera();
 }
 
 // ----------------------------------------------------
@@ -61,9 +70,17 @@ bool userRequestedExit() {
 
 // ----------------------------------------------------
 // Forward declaration (to be implemented in traffic_density.cpp)
-void analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
+std::string analyzeTrafficDensity(const std::string& imagePath);
 
 // ----------------------------------------------------
+
+// Simple notification function that logs to cout
+void sendTrafficNotification(const std::string& avenueName, const std::string& report) {
+    std::cout << "[NOTIFICATION] Traffic report for " << avenueName << ": " << report << "\n";
+}
+
+
+
 int main(int argc, char* argv[]) {
 
     std::string mode;
@@ -81,11 +98,12 @@ int main(int argc, char* argv[]) {
             auto [avenueName, imagePath] = image_capture_demo();
 
             if (imagePath.empty()) {
-                std::cout << "No more demo images. Exiting demo mode.\n";
+                std::cout << "No demo images. Exiting demo mode.\n";
                 break;
             }
 
-            auto [report] = analyzeTrafficDensity();
+            std::string processedImagePath = test_static_image(imagePath, avenueName);
+            std::string report = analyzeTrafficDensity(processedImagePath);
 
             sendTrafficNotification(
                 avenueName,
@@ -108,10 +126,11 @@ int main(int argc, char* argv[]) {
     else if (mode == "live") {
         while (true) {
             auto [avenueName, imagePath] = image_capture_live();
-            auto [report] = analyzeTrafficDensity();
+            std::string processedImagePath = test_static_image(imagePath, avenueName);
+            std::string report = analyzeTrafficDensity(processedImagePath);
             sendTrafficNotification(
                 avenueName,
-                report,
+                report
             );
 
             // Wait 36 seconds for camera to get back into position, exit early if user presses ENTER

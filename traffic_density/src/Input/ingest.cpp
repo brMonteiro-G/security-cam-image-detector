@@ -1,3 +1,14 @@
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
+
+#include <filesystem>
+#include <chrono>
+#include <utility>
+#include <string>
+
+
 std::pair<std::string, std::string> ingest_camera() {
     static bool first_time = true;   // <--- stays true only on first call
 
