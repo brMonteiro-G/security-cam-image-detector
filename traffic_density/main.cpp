@@ -1,16 +1,19 @@
 #include <string>
 
 // Forward declaration (to be implemented in traffic_density.cpp)
-void analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
+std::string analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
+
+// Image capture
+std::pair<std::string, std::string> ingest_camera();
 
 int main() {
 	auto [avenueName, imagePath] = ingest_camera();
-    auto [report] = analyzeTrafficDensity(imagePath, avenueName);
+    std::string report = analyzeTrafficDensity(imagePath, avenueName);
 
-    sendTrafficNotification(
-    avenueName,
-    report,
-    );
+    // sendTrafficNotification(
+    // avenueName,
+    // report,
+    // );
 
 	return 0;
 }

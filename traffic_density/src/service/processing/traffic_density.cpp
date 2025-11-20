@@ -80,7 +80,7 @@ string getTimestamp() {
 
 
 
-int main() {
+string analyzeTrafficDensity(const string& imagePath){
     // Load YOLO model
     Net net = readNet("../resources/models/yolov3.weights", "../resources/models/yolov3.cfg");
 
@@ -91,7 +91,7 @@ int main() {
     Mat image = imread("../resources/images/gemini_sec_cam_traffic.png");
     if (image.empty()) {
         cerr << "Image not found!" << endl;
-        return -1;
+        return "Error: Image not found";
     }
 
     int height = image.rows;
@@ -155,7 +155,11 @@ int main() {
     double density = densityAnalyzer.computeDensity(finalBoxes, image);
     string condition = densityAnalyzer.analyzeDensity(density);
 
-    const report = vehicleCount + " vehicles detected with density " + to_string(density) + ". Condition: " + condition;
+    std::string report = std::to_string(vehicleCount) + 
+    " vehicles detected with density " + 
+    std::to_string(density) + 
+    ". Condition: " + 
+    condition;
 
     // Draw results
     for (size_t i = 0; i < indexes.size(); i++) {
@@ -172,4 +176,5 @@ int main() {
     destroyAllWindows();
 
     return {report};
+
 }
