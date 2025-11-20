@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
+#include <filesystem>
 #include <nlohmann/json.hpp>  // JSON library (https://github.com/nlohmann/json)
 
 using namespace cv;
@@ -80,19 +81,56 @@ string getTimestamp() {
 
 
 
-string analyzeTrafficDensity(const string& imagePath){
-    // Load YOLO model
-    Net net = readNet("../resources/models/yolov3.weights", "../resources/models/yolov3.cfg");
+string analyzeTrafficDensity(const string& imagePath, const std::string& avenueName){
+
+    printf("Starting traffic density analysis...\n");
+
+    // Use consistent paths for model files
+    string weightsPath = "../resources/models/yolov3.weights";
+    string configPath = "../resources/models/yolov3.cfg";
+
+    // Convert to absolute paths to avoid any path resolution issues
+    weightsPath = std::filesystem::absolute(weightsPath).string();
+    configPath = std::filesystem::absolute(configPath).string();
+
+    printf("Absolute paths: weights=%s, config=%s\n", weightsPath.c_str(), configPath.c_str());
+
+    if (!std::filesystem::exists(weightsPath) || !std::filesystem::exists(configPath)) {
+        std::cerr << "YOLO model files not found!" << std::endl;
+        std::cerr << "Looking for: " << weightsPath << " and " << configPath << std::endl;
+        return "Error: YOLO model files not found";
+    }
+
+    // Load YOLO model using Darknet-specific function
+    printf("Loading YOLO model from: %s and %s\n", weightsPath.c_str(), configPath.c_str());
+    Net net;
+    try {
+        net = readNetFromDarknet(configPath, weightsPath);
+        if (net.empty()) {
+            std::cerr << "Failed to load YOLO network (net is empty)" << std::endl;
+            return "Error: Failed to load YOLO network";
+        }
+    } catch (const cv::Exception& e) {
+        std::cerr << "OpenCV exception while loading model: " << e.what() << std::endl;
+        return "Error: OpenCV exception during model loading";
+    } catch (const std::exception& e) {
+        std::cerr << "Exception while loading model: " << e.what() << std::endl;
+        return "Error: Exception during model loading";
+    }
+
+    printf("Model loaded successfully.\n");
 
     // Vehicle classes (COCO indices)
     set<int> vehicleClassIds = {2, 3, 5, 7};
 
     // Load image
-    Mat image = imread("../resources/images/gemini_sec_cam_traffic.png");
+    Mat image = imread(imagePath);
     if (image.empty()) {
         cerr << "Image not found!" << endl;
         return "Error: Image not found";
     }
+
+    printf("Image loaded successfully.\n");
 
     int height = image.rows;
     int width = image.cols;

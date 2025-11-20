@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 # =======================
 
 # OpenCV
-find_package(OpenCV REQUIRED core highgui imgproc viz)
+find_package(OpenCV REQUIRED core highgui imgproc dnn)
 find_package(HDF5 REQUIRED)
 
 # Find VTK

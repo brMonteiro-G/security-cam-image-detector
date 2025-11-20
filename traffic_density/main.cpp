@@ -8,6 +8,8 @@ std::pair<std::string, std::string> ingest_camera();
 
 int main() {
 	auto [avenueName, imagePath] = ingest_camera();
+    printf("Avenue: %s\nImage Path: %s\n", avenueName.c_str(), imagePath.c_str());
+    
     std::string report = analyzeTrafficDensity(imagePath, avenueName);
 
     // sendTrafficNotification(
