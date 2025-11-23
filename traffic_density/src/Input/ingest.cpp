@@ -9,8 +9,8 @@
 
 // Returns: pair<avenue_name, generated_image_path>
 std::pair<std::string, std::string> ingest_camera() {
-    const std::string url = "https://cameras.santoandre.sp.gov.br/coi04/ID_655";
-    const int camera_id = 655;
+    const std::string url = "https://cameras.santoandre.sp.gov.br/coi02/ID_074";
+    const int camera_id = 074;
     const std::string output_dir = "../resources/images/avenida_dos_estados";
     const int interval_seconds = 20;
     const std::string avenue_name = "Avenida dos Estados";
