@@ -14,8 +14,6 @@
 using namespace cv;
 using namespace dnn;
 using namespace std;
-using json = nlohmann::json;
-using namespace std::chrono_literals;
 
 // === TrafficDensity Class ===
 class TrafficDensity {
@@ -32,12 +30,9 @@ public:
     }
 
     string analyzeDensity(double density) {
-        cout << "Estimated density: " << density << endl;
         if (density > threshold_) {
-            cout << "⚠️  Heavy traffic detected!" << endl;
             return "Heavy traffic";
         } else {
-            cout << "✅  Light traffic." << endl;
             return "Light traffic";
         }
     }
@@ -64,7 +59,7 @@ void drawRoundedRectangle(Mat& img, Rect box, Scalar color, int thickness = 2) {
     circle(img, Point(x + w - radius, y + h - radius), radius, color, thickness);
 }
 
-// === Get timestamp string ===
+// === Timestamp (unchanged) ===
 string getTimestamp() {
     auto now = chrono::system_clock::now();
     time_t t = chrono::system_clock::to_time_t(now);
@@ -80,6 +75,11 @@ string getTimestamp() {
 }
 
 
+namespace {
+struct YoloContext {
+    Net net;
+    vector<String> outputLayers;
+};
 
 string analyzeTrafficDensity(const string& imagePath, const std::string& avenueName){
 
@@ -120,9 +120,27 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
 
     printf("Model loaded successfully.\n");
 
-    // Vehicle classes (COCO indices)
-    set<int> vehicleClassIds = {2, 3, 5, 7};
+        vector<String> layerNames = ctx.net.getLayerNames();
+        vector<int> outLayers = ctx.net.getUnconnectedOutLayers();
+        ctx.outputLayers.reserve(outLayers.size());
+        for (int idx : outLayers) {
+            ctx.outputLayers.push_back(layerNames[idx - 1]);
+        }
+    });
+    return ctx;
+}
 
+const set<int>& vehicleClassIds() {
+    static const set<int> ids = {2, 3, 5, 7};
+    return ids;
+}
+} // namespace
+
+// =================================================================
+// === NEW FUNCTION: runDetection() — your old main() code goes here ===
+// =================================================================
+string analyzeTrafficDensity(const string& imagePath)
+{
     // Load image
     Mat image = imread(imagePath);
     if (image.empty()) {
@@ -135,21 +153,14 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
     int height = image.rows;
     int width = image.cols;
 
-    // Prepare input blob
+    // Prepare input
     Mat blob;
-    blobFromImage(image, blob, 0.00392, Size(416, 416), Scalar(0, 0, 0), true, false);
-    net.setInput(blob);
+    blobFromImage(image, blob, 0.00392, Size(416, 416),
+                  Scalar(0, 0, 0), true, false);
+    ctx.net.setInput(blob);
 
-    // Get output layer names
-    vector<String> layerNames = net.getLayerNames();
-    vector<int> outLayers = net.getUnconnectedOutLayers();
-    vector<String> outputLayers;
-    for (int i : outLayers)
-        outputLayers.push_back(layerNames[i - 1]);
-
-    // Forward pass
     vector<Mat> outs;
-    net.forward(outs, outputLayers);
+    ctx.net.forward(outs, ctx.outputLayers);
 
     vector<int> classIds;
     vector<float> confidences;
@@ -164,11 +175,11 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
             minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
             int classId = classIdPoint.x;
 
-            if (confidence > 0.5 && vehicleClassIds.count(classId)) {
-                int centerX = static_cast<int>(data[0] * width);
-                int centerY = static_cast<int>(data[1] * height);
-                int w = static_cast<int>(data[2] * width);
-                int h = static_cast<int>(data[3] * height);
+            if (confidence > 0.5 && vehicleIds.count(classId)) {
+                int centerX = (int)(data[0] * width);
+                int centerY = (int)(data[1] * height);
+                int w = (int)(data[2] * width);
+                int h = (int)(data[3] * height);
                 int x = centerX - w / 2;
                 int y = centerY - h / 2;
 
@@ -179,15 +190,12 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
         }
     }
 
-    // Non-Maximum Suppression
     vector<int> indexes;
     NMSBoxes(boxes, confidences, 0.5, 0.4, indexes);
 
-    int vehicleCount = (int)indexes.size();
-    cout << "🚘 Detected vehicles: " << vehicleCount << endl;
+    int vehicleCount = indexes.size();
 
-    // Calculate density and condition
-    TrafficDensity densityAnalyzer(0.02);  // 2% threshold
+    TrafficDensity densityAnalyzer(0.02);
     vector<Rect> finalBoxes;
     for (int idx : indexes) finalBoxes.push_back(boxes[idx]);
     double density = densityAnalyzer.computeDensity(finalBoxes, image);
@@ -199,19 +207,25 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
     ". Condition: " + 
     condition;
 
-    // Draw results
-    for (size_t i = 0; i < indexes.size(); i++) {
-        int idx = indexes[i];
+    // Draw boxes
+    for (int idx : indexes) {
         Rect box = boxes[idx];
         drawRoundedRectangle(image, box, Scalar(0, 255, 0), 2);
-        putText(image, "Vehicle " + to_string(i + 1),
+        putText(image, "Vehicle",
                 Point(box.x, box.y - 8),
-                FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 255, 0), 2);
+                FONT_HERSHEY_SIMPLEX, 0.6,
+                Scalar(0, 255, 0), 2);
+    }
+
+    static bool windowInitialized = false;
+    if (!windowInitialized) {
+        namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
+        resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
+        windowInitialized = true;
     }
 
     imshow("YOLO Vehicle Detection + Density", image);
-    waitKey(0);
-    destroyAllWindows();
+    waitKey(1);   // non-blocking; window stays open
 
     return {report};
 

@@ -1,57 +1,83 @@
-
 #include <opencv2/opencv.hpp>
-#include <iostream>
-#include <chrono>
-#include <thread>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
+
 #include <filesystem>
+#include <chrono>
 #include <utility>
 #include <string>
 
-// Returns: pair<avenue_name, generated_image_path>
+
 std::pair<std::string, std::string> ingest_camera() {
     const std::string url = "https://cameras.santoandre.sp.gov.br/coi02/ID_074";
     const int camera_id = 074;
     const std::string output_dir = "../resources/images/avenida_dos_estados";
     const int interval_seconds = 20;
     const std::string avenue_name = "Avenida dos Estados";
+    const std::string output_dir = "../../resources/images/avenida_dos_estados";
 
     std::filesystem::create_directories(output_dir);
+
     cv::VideoCapture cap(url);
     if (!cap.isOpened()) {
-        std::cerr << "Error: Unable to open video stream." << std::endl;
+        std::cerr << "Error: Unable to open stream\n";
         return {avenue_name, ""};
     }
 
-    auto last_saved = std::chrono::steady_clock::now();
     cv::Mat frame;
-    std::string last_filename;
 
-    while (true) {
-        cap >> frame;
+    // ---------- FIRST CALL ONLY ----------
+    if (first_time) {
+        std::cout << "Preview mode (first call only).\n";
+        std::cout << "Press SPACE to capture the current viewpoint.\n";
+        std::cout << "Press Q to quit without capturing.\n";
+
+        cv::namedWindow("Camera Preview", cv::WINDOW_AUTOSIZE);
+        while (true) {
+            cap >> frame;
+            if (frame.empty()) {
+                std::cerr << "Error: Empty frame\n";
+                break;
+            }
+            cv::Mat displayFrame;
+            cv::resize(frame, displayFrame, cv::Size(1280, 720));
+            cv::imshow("Camera Preview", displayFrame);
+            int key = cv::waitKey(1);
+
+            if (key == ' ') {  // SPACE pressed
+                break;
+            }
+            if (key == 'q' || key == 'Q') {
+                cap.release();
+                cv::destroyWindow("Camera Preview");
+                return {avenue_name, ""};
+            }
+        }
+
+        cv::destroyWindow("Camera Preview");
+        first_time = false;  // <--- future calls will skip preview
+    }
+    // ---------- SUBSEQUENT CALLS ----------
+    else {
+        cap >> frame;  // just grab one frame immediately
         if (frame.empty()) {
-            std::cerr << "Error: Unable to retrieve frame." << std::endl;
-            break;
-        }
-
-        // Save a screenshot every INTERVAL_SECONDS
-        auto current_time = std::chrono::steady_clock::now();
-        auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(current_time - last_saved).count();
-
-        if (elapsed_seconds >= interval_seconds) {
-            last_filename = output_dir + "/screenshot_" + std::to_string(camera_id) + "_" + std::to_string(std::chrono::duration_cast<std::chrono::seconds>(current_time.time_since_epoch()).count()) + ".jpg";
-            cv::imwrite(last_filename, frame);
-            std::cout << "Saved: " << last_filename << std::endl;
-            last_saved = current_time;
-            break; // Only take one screenshot per call
-        }
-
-        // Exit if 'q' is pressed
-        if (cv::waitKey(1) == 'q') {
-            break;
+            std::cerr << "Error: Empty frame\n";
+            return {avenue_name, ""};
         }
     }
 
+    // Save the captured frame
+    long ts = std::chrono::duration_cast<std::chrono::seconds>(
+                  std::chrono::system_clock::now().time_since_epoch())
+                  .count();
+
+    std::string filename =
+        output_dir + "/screenshot_" + std::to_string(camera_id) + "_" +
+        std::to_string(ts) + ".jpg";
+
+    cv::imwrite(filename, frame);
     cap.release();
-    cv::destroyAllWindows();
-    return {avenue_name, last_filename};
+
+    return {avenue_name, filename};
 }
