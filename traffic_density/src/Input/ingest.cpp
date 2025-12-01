@@ -10,10 +10,10 @@
 
 
 std::pair<std::string, std::string> ingest_camera() {
-    static bool first_time = true;   // <--- stays true only on first call
-
     const std::string url = "https://cameras.santoandre.sp.gov.br/coi02/ID_074";
     const int camera_id = 074;
+    const std::string output_dir = "../resources/images/avenida_dos_estados";
+    const int interval_seconds = 20;
     const std::string avenue_name = "Avenida dos Estados";
     const std::string output_dir = "../../resources/images/avenida_dos_estados";
 

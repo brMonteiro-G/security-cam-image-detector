@@ -8,47 +8,29 @@
 #include <limits>
 #include <system_error>
 
+// Forward declaration (to be implemented in traffic_density.cpp)
+std::string analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
 
-#include <utility>
+std::string test_static_image(const std::string& imagePath, const std::string& avenueName);
+
 
 // Image capture
 std::pair<std::string, std::string> ingest_camera();
-std::string test_static_image(const std::string& imagePath, const std::string& avenueName);
 
-// ----------------------------------------------------
-// DEMO version of image_capture
-// ----------------------------------------------------
-std::pair<std::string, std::string> image_capture_demo() {
-    // Generator-like function that returns an image from the folder every
-    // time it is called. When done it loops to the beginning, keeping the demo
-    // running with only a few images
+int main() {
+	auto [avenueName, imagePath] = ingest_camera();
+    printf("Avenue: %s\nImage Path: %s\n", avenueName.c_str(), imagePath.c_str());
+    
+    std::string processedImagePath = test_static_image(imagePath, avenueName);
 
-    static std::vector<std::filesystem::path> files;
-    static size_t index = 0;
+    printf("Processed Image Path: %s\n", processedImagePath.c_str());
+    
+    std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
 
-    // Load files only once
-    if (files.empty()) {
-        std::string folder = "./resources/images/demo";
-        for (const auto& entry : std::filesystem::directory_iterator(folder)) {
-            if (entry.is_regular_file())
-                files.push_back(entry.path());
-        }
-    }
-
-    if (files.empty()) {
-        return { "NoFiles", "" };
-    }
-
-    // Get the current file
-    const auto& path = files[index];
-
-    // Move to next, wrap around
-    index = (index + 1) % files.size();
-
-    // Generate static name (ex: use filename without extension)
-    std::string avenueName = "Avenida dos Estados";
-
-    return { avenueName, path.string() };
+    // sendTrafficNotification(
+    // avenueName,
+    // report,
+    // );
 
 }
 

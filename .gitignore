@@ -41,3 +41,6 @@
 *.dwo
 
 build/
+
+resources/images/*
+traffic_density/resources/images/*

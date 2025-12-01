@@ -8,7 +8,8 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
-#include <mutex>
+#include <filesystem>
+#include <nlohmann/json.hpp>  // JSON library (https://github.com/nlohmann/json)
 
 using namespace cv;
 using namespace dnn;
@@ -80,15 +81,44 @@ struct YoloContext {
     vector<String> outputLayers;
 };
 
-YoloContext& getYoloContext() {
-    static once_flag initFlag;
-    static YoloContext ctx;
-    call_once(initFlag, []() {
-        ctx.net = readNetFromDarknet(
-            "../resources/models/yolov3.cfg",
-            "../resources/models/yolov3.weights");
-        ctx.net.setPreferableBackend(DNN_BACKEND_OPENCV);
-        ctx.net.setPreferableTarget(DNN_TARGET_CPU);
+string analyzeTrafficDensity(const string& imagePath, const std::string& avenueName){
+
+    printf("Starting traffic density analysis...\n");
+
+    // Use consistent paths for model files
+    string weightsPath = "../resources/models/yolov3.weights";
+    string configPath = "../resources/models/yolov3.cfg";
+
+    // Convert to absolute paths to avoid any path resolution issues
+    weightsPath = std::filesystem::absolute(weightsPath).string();
+    configPath = std::filesystem::absolute(configPath).string();
+
+    printf("Absolute paths: weights=%s, config=%s\n", weightsPath.c_str(), configPath.c_str());
+
+    if (!std::filesystem::exists(weightsPath) || !std::filesystem::exists(configPath)) {
+        std::cerr << "YOLO model files not found!" << std::endl;
+        std::cerr << "Looking for: " << weightsPath << " and " << configPath << std::endl;
+        return "Error: YOLO model files not found";
+    }
+
+    // Load YOLO model using Darknet-specific function
+    printf("Loading YOLO model from: %s and %s\n", weightsPath.c_str(), configPath.c_str());
+    Net net;
+    try {
+        net = readNetFromDarknet(configPath, weightsPath);
+        if (net.empty()) {
+            std::cerr << "Failed to load YOLO network (net is empty)" << std::endl;
+            return "Error: Failed to load YOLO network";
+        }
+    } catch (const cv::Exception& e) {
+        std::cerr << "OpenCV exception while loading model: " << e.what() << std::endl;
+        return "Error: OpenCV exception during model loading";
+    } catch (const std::exception& e) {
+        std::cerr << "Exception while loading model: " << e.what() << std::endl;
+        return "Error: Exception during model loading";
+    }
+
+    printf("Model loaded successfully.\n");
 
         vector<String> layerNames = ctx.net.getLayerNames();
         vector<int> outLayers = ctx.net.getUnconnectedOutLayers();
@@ -114,11 +144,11 @@ string analyzeTrafficDensity(const string& imagePath)
     // Load image
     Mat image = imread(imagePath);
     if (image.empty()) {
-        return "Error: could not load image at " + imagePath;
+        cerr << "Image not found!" << endl;
+        return "Error: Image not found";
     }
 
-    YoloContext& ctx = getYoloContext();
-    const set<int>& vehicleIds = vehicleClassIds();
+    printf("Image loaded successfully.\n");
 
     int height = image.rows;
     int width = image.cols;
@@ -171,11 +201,11 @@ string analyzeTrafficDensity(const string& imagePath)
     double density = densityAnalyzer.computeDensity(finalBoxes, image);
     string condition = densityAnalyzer.analyzeDensity(density);
 
-    string report =
-        to_string(vehicleCount) +
-        " vehicles detected. Density = " +
-        to_string(density) +
-        ". Condition: " + condition;
+    std::string report = std::to_string(vehicleCount) + 
+    " vehicles detected with density " + 
+    std::to_string(density) + 
+    ". Condition: " + 
+    condition;
 
     // Draw boxes
     for (int idx : indexes) {
@@ -197,5 +227,6 @@ string analyzeTrafficDensity(const string& imagePath)
     imshow("YOLO Vehicle Detection + Density", image);
     waitKey(1);   // non-blocking; window stays open
 
-    return report;
+    return {report};
+
 }
