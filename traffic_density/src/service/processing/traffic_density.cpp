@@ -8,12 +8,11 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
-#include <nlohmann/json.hpp>
+#include <mutex>
 
 using namespace cv;
 using namespace dnn;
 using namespace std;
-using json = nlohmann::json;
 
 // === TrafficDensity Class ===
 class TrafficDensity {
@@ -75,45 +74,63 @@ string getTimestamp() {
 }
 
 
+namespace {
+struct YoloContext {
+    Net net;
+    vector<String> outputLayers;
+};
+
+YoloContext& getYoloContext() {
+    static once_flag initFlag;
+    static YoloContext ctx;
+    call_once(initFlag, []() {
+        ctx.net = readNetFromDarknet(
+            "../resources/models/yolov3.cfg",
+            "../resources/models/yolov3.weights");
+        ctx.net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        ctx.net.setPreferableTarget(DNN_TARGET_CPU);
+
+        vector<String> layerNames = ctx.net.getLayerNames();
+        vector<int> outLayers = ctx.net.getUnconnectedOutLayers();
+        ctx.outputLayers.reserve(outLayers.size());
+        for (int idx : outLayers) {
+            ctx.outputLayers.push_back(layerNames[idx - 1]);
+        }
+    });
+    return ctx;
+}
+
+const set<int>& vehicleClassIds() {
+    static const set<int> ids = {2, 3, 5, 7};
+    return ids;
+}
+} // namespace
+
 // =================================================================
 // === NEW FUNCTION: runDetection() — your old main() code goes here ===
 // =================================================================
 string analyzeTrafficDensity(const string& imagePath)
 {
-    printf("Analyzing traffic density for image at %s\n", imagePath.c_str());
-    // Load YOLO
-    Net net = readNet("../resources/models/yolov3.weights",
-                      "../resources/models/yolov3.cfg");
-
-    set<int> vehicleClassIds = {2, 3, 5, 7};
-
-    printf("YOLO model loaded.\n");
     // Load image
     Mat image = imread(imagePath);
     if (image.empty()) {
         return "Error: could not load image at " + imagePath;
     }
 
+    YoloContext& ctx = getYoloContext();
+    const set<int>& vehicleIds = vehicleClassIds();
+
     int height = image.rows;
     int width = image.cols;
 
-
-    printf("Preparing input blob for YOLO.\n");
     // Prepare input
     Mat blob;
     blobFromImage(image, blob, 0.00392, Size(416, 416),
                   Scalar(0, 0, 0), true, false);
-    net.setInput(blob);
-
-    // Output layers
-    vector<String> layerNames = net.getLayerNames();
-    vector<int> outLayers = net.getUnconnectedOutLayers();
-    vector<String> outputLayers;
-    for (int i : outLayers)
-        outputLayers.push_back(layerNames[i - 1]);
+    ctx.net.setInput(blob);
 
     vector<Mat> outs;
-    net.forward(outs, outputLayers);
+    ctx.net.forward(outs, ctx.outputLayers);
 
     vector<int> classIds;
     vector<float> confidences;
@@ -128,7 +145,7 @@ string analyzeTrafficDensity(const string& imagePath)
             minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
             int classId = classIdPoint.x;
 
-            if (confidence > 0.5 && vehicleClassIds.count(classId)) {
+            if (confidence > 0.5 && vehicleIds.count(classId)) {
                 int centerX = (int)(data[0] * width);
                 int centerY = (int)(data[1] * height);
                 int w = (int)(data[2] * width);
@@ -168,6 +185,13 @@ string analyzeTrafficDensity(const string& imagePath)
                 Point(box.x, box.y - 8),
                 FONT_HERSHEY_SIMPLEX, 0.6,
                 Scalar(0, 255, 0), 2);
+    }
+
+    static bool windowInitialized = false;
+    if (!windowInitialized) {
+        namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
+        resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
+        windowInitialized = true;
     }
 
     imshow("YOLO Vehicle Detection + Density", image);

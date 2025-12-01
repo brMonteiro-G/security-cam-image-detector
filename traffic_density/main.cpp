@@ -5,6 +5,8 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <limits>
+#include <system_error>
 
 
 #include <utility>
@@ -17,8 +19,6 @@ std::string test_static_image(const std::string& imagePath, const std::string& a
 // DEMO version of image_capture
 // ----------------------------------------------------
 std::pair<std::string, std::string> image_capture_demo() {
-    std::cout << "[DEMO] Simulating image capture...\n";
-
     // Generator-like function that returns an image from the folder every
     // time it is called. When done it loops to the beginning, keeping the demo
     // running with only a few images
@@ -56,7 +56,6 @@ std::pair<std::string, std::string> image_capture_demo() {
 // LIVE version of image_capture
 // ----------------------------------------------------
 std::pair<std::string, std::string> image_capture_live() {
-    std::cout << "[LIVE] Capturing real image from camera...\n";
     // Actual camera capture code here
     return ingest_camera();
 }
@@ -89,12 +88,14 @@ int main(int argc, char* argv[]) {
     else {
         std::cout << "Select mode (demo/live): ";
         std::cin >> mode;
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 
     // Convert to lowercase
     for (auto &c : mode) c = std::tolower(c);
 
     if (mode == "demo") {
+        std::cout << "Entering demo mode. Press ENTER at any time to stop.\n";
         while (true) {
             auto [avenueName, imagePath] = image_capture_demo();
 
@@ -116,7 +117,7 @@ int main(int argc, char* argv[]) {
                 if (userRequestedExit()) {
                     std::string line;
                     std::getline(std::cin, line); // consume input
-                    std::cout << "Exiting demo mode...\n";
+                    std::cout << "Exit requested. Leaving demo mode...\n";
                     return 0; // or break;
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -125,27 +126,51 @@ int main(int argc, char* argv[]) {
     }
 
     else if (mode == "live") {
-        while (true) {
-            auto [avenueName, imagePath] = image_capture_live();
-            printf("Captured image for %s at %s\n", avenueName.c_str(), imagePath.c_str());
-            std::string processedImagePath = test_static_image(imagePath, avenueName);
-            
-            std::string report = analyzeTrafficDensity(processedImagePath);
-            sendTrafficNotification(
-                avenueName,
-                report
-            );
+        std::cout << "Entering live mode. Press ENTER at any time to stop.\n";
+        using clock = std::chrono::steady_clock;
+        auto lastReport = clock::now() - std::chrono::seconds(30);
 
-            // Wait 36 seconds for camera to get back into position, exit early if user presses ENTER
-            for (int i = 0; i < 360; ++i) {
-                if (userRequestedExit()) {
-                    std::string line;
-                    std::getline(std::cin, line); // consume input
-                    std::cout << "Exiting demo mode...\n";
-                    return 0; // or break;
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        while (true) {
+            if (userRequestedExit()) {
+                std::string line;
+                std::getline(std::cin, line); // consume input
+                std::cout << "Exit requested. Leaving live mode...\n";
+                return 0;
             }
+
+            auto [avenueName, imagePath] = image_capture_live();
+            if (imagePath.empty()) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                continue;
+            }
+
+            auto now = clock::now();
+            bool shouldReport = (now - lastReport) >= std::chrono::seconds(30);
+
+            std::string analysisPath = imagePath;
+            if (shouldReport) {
+                std::string processedImagePath = test_static_image(imagePath, avenueName);
+                if (!processedImagePath.empty()) {
+                    analysisPath = processedImagePath;
+                }
+            }
+
+            std::string report = analyzeTrafficDensity(analysisPath);
+
+            if (shouldReport && !report.empty()) {
+                sendTrafficNotification(
+                    avenueName,
+                    report
+                );
+                lastReport = now;
+            }
+
+            if (!imagePath.empty()) {
+                std::error_code ec;
+                std::filesystem::remove(imagePath, ec);
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
     else {
@@ -155,4 +180,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

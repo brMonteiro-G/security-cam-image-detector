@@ -12,8 +12,8 @@
 std::pair<std::string, std::string> ingest_camera() {
     static bool first_time = true;   // <--- stays true only on first call
 
-    const std::string url = "https://cameras.santoandre.sp.gov.br/coi04/ID_655";
-    const int camera_id = 655;
+    const std::string url = "https://cameras.santoandre.sp.gov.br/coi02/ID_074";
+    const int camera_id = 074;
     const std::string avenue_name = "Avenida dos Estados";
     const std::string output_dir = "../../resources/images/avenida_dos_estados";
 
@@ -33,14 +33,16 @@ std::pair<std::string, std::string> ingest_camera() {
         std::cout << "Press SPACE to capture the current viewpoint.\n";
         std::cout << "Press Q to quit without capturing.\n";
 
+        cv::namedWindow("Camera Preview", cv::WINDOW_AUTOSIZE);
         while (true) {
             cap >> frame;
             if (frame.empty()) {
                 std::cerr << "Error: Empty frame\n";
                 break;
             }
-
-            cv::imshow("Camera Preview", frame);
+            cv::Mat displayFrame;
+            cv::resize(frame, displayFrame, cv::Size(1280, 720));
+            cv::imshow("Camera Preview", displayFrame);
             int key = cv::waitKey(1);
 
             if (key == ' ') {  // SPACE pressed
@@ -48,12 +50,12 @@ std::pair<std::string, std::string> ingest_camera() {
             }
             if (key == 'q' || key == 'Q') {
                 cap.release();
-                cv::destroyAllWindows();
+                cv::destroyWindow("Camera Preview");
                 return {avenue_name, ""};
             }
         }
 
-        cv::destroyAllWindows();
+        cv::destroyWindow("Camera Preview");
         first_time = false;  // <--- future calls will skip preview
     }
     // ---------- SUBSEQUENT CALLS ----------
@@ -75,11 +77,7 @@ std::pair<std::string, std::string> ingest_camera() {
         std::to_string(ts) + ".jpg";
 
     cv::imwrite(filename, frame);
-    std::cout << "Captured: " << filename << "\n";
-
-    printf("Captured image for %s at %s\n", avenue_name.c_str(), filename.c_str());
     cap.release();
-    printf("after release\n");
 
     return {avenue_name, filename};
 }

@@ -78,24 +78,13 @@ string test_static_image(const string& image_path, const string& avenue_name) {
         cout << "Image not found: " << image_path << endl;
         return "";
     }
-    printf("Processing image for %s at %s\n", avenue_name.c_str(), image_path.c_str());
     Mat frame = imread(image_path);
     if (frame.empty()) {
         cout << "Failed to load image: " << image_path << endl;
         return "";
     }
 
-    printf("Loaded image for %s at %s\n", avenue_name.c_str(), image_path.c_str());
     string saved_path = preprocess_static(frame, avenue_name);
 
-    printf("Processed image saved at %s\n", saved_path.c_str());
-    // Side-by-side display (equivalent of np.hstack)
-    Mat processed = imread(saved_path);
-    Mat combined;
-    hconcat(frame, processed, combined);
-    printf("Displaying original and processed images side by side.\n");
-    imshow("Original | Processed", combined);
-    waitKey(1);
-    printf("Displayed image for %s at %s\n", avenue_name.c_str(), saved_path.c_str());
     return saved_path;
 }
