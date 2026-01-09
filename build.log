@@ -1,0 +1,74 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.lambda
+#1 transferring dockerfile: 6.37kB done
+#1 WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 4)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for public.ecr.aws/lambda/provided:al2023
+#2 DONE 0.4s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [builder  1/15] FROM public.ecr.aws/lambda/provided:al2023@sha256:eb9e9e4a729d9b196467f8728f0a22530b38de43ec0b9b233414a1d668b0e4cd
+#4 resolve public.ecr.aws/lambda/provided:al2023@sha256:eb9e9e4a729d9b196467f8728f0a22530b38de43ec0b9b233414a1d668b0e4cd 0.0s done
+#4 CACHED
+
+#5 [internal] load build context
+#5 transferring context: 1.57kB done
+#5 DONE 0.0s
+
+#6 [builder  2/15] RUN dnf remove -y libcurl-minimal &&     dnf install -y     gcc-c++     cmake     make     wget     unzip     git     tar     pkgconfig     python3     python3-pip     libjpeg-turbo-devel     libpng-devel     libtiff-devel     zlib-devel     openssl-devel     libcurl-devel     && dnf clean all
+#6 0.180 error: Could not depsolve transaction; 1 problem detected:
+#6 0.180  Problem: package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl.so.4()(64bit), but none of the providers can be installed
+#6 0.180   - package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl(aarch-64) >= 8.11.1-4.amzn2023.0.1, but none of the providers can be installed
+#6 0.180   - conflicting requests
+#6 0.180   - problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64
+#6 ERROR: process "/bin/sh -c dnf remove -y libcurl-minimal &&     dnf install -y     gcc-c++     cmake     make     wget     unzip     git     tar     pkgconfig     python3     python3-pip     libjpeg-turbo-devel     libpng-devel     libtiff-devel     zlib-devel     openssl-devel     libcurl-devel     && dnf clean all" did not complete successfully: exit code: 1
+
+#7 [stage-1  2/17] RUN dnf remove -y libcurl-minimal &&     dnf install -y     libjpeg-turbo     libpng     libtiff     zlib     libcurl     openssl     ca-certificates     && dnf clean all
+#7 0.180 error: Could not depsolve transaction; 1 problem detected:
+#7 0.180  Problem: package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl.so.4()(64bit), but none of the providers can be installed
+#7 0.180   - package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl(aarch-64) >= 8.11.1-4.amzn2023.0.1, but none of the providers can be installed
+#7 0.180   - conflicting requests
+#7 0.180   - problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64
+#7 ERROR: process "/bin/sh -c dnf remove -y libcurl-minimal &&     dnf install -y     libjpeg-turbo     libpng     libtiff     zlib     libcurl     openssl     ca-certificates     && dnf clean all" did not complete successfully: exit code: 1
+------
+ > [stage-1  2/17] RUN dnf remove -y libcurl-minimal &&     dnf install -y     libjpeg-turbo     libpng     libtiff     zlib     libcurl     openssl     ca-certificates     && dnf clean all:
+0.180 error: Could not depsolve transaction; 1 problem detected:
+0.180  Problem: package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl.so.4()(64bit), but none of the providers can be installed
+0.180   - package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl(aarch-64) >= 8.11.1-4.amzn2023.0.1, but none of the providers can be installed
+0.180   - conflicting requests
+0.180   - problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64
+------
+------
+ > [builder  2/15] RUN dnf remove -y libcurl-minimal &&     dnf install -y     gcc-c++     cmake     make     wget     unzip     git     tar     pkgconfig     python3     python3-pip     libjpeg-turbo-devel     libpng-devel     libtiff-devel     zlib-devel     openssl-devel     libcurl-devel     && dnf clean all:
+0.180 error: Could not depsolve transaction; 1 problem detected:
+0.180  Problem: package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl.so.4()(64bit), but none of the providers can be installed
+0.180   - package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64 from @System requires libcurl(aarch-64) >= 8.11.1-4.amzn2023.0.1, but none of the providers can be installed
+0.180   - conflicting requests
+0.180   - problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.aarch64
+------
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 4)
+Dockerfile.lambda:120
+--------------------
+ 119 |     # Note: Remove libcurl-minimal and install full libcurl for AWS SDK
+ 120 | >>> RUN dnf remove -y libcurl-minimal && \
+ 121 | >>>     dnf install -y \
+ 122 | >>>     libjpeg-turbo \
+ 123 | >>>     libpng \
+ 124 | >>>     libtiff \
+ 125 | >>>     zlib \
+ 126 | >>>     libcurl \
+ 127 | >>>     openssl \
+ 128 | >>>     ca-certificates \
+ 129 | >>>     && dnf clean all
+ 130 |     
+--------------------
+ERROR: failed to solve: process "/bin/sh -c dnf remove -y libcurl-minimal &&     dnf install -y     libjpeg-turbo     libpng     libtiff     zlib     libcurl     openssl     ca-certificates     && dnf clean all" did not complete successfully: exit code: 1
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/z9qjerleqg1yzn8yo2svhwgrx

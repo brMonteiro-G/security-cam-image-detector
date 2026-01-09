@@ -1,0 +1,35 @@
+# Example Terraform Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "dev"
+
+# Project naming
+project_name = "security-cam-detector"
+
+# Notification Settings
+notification_emails = [
+  "your-email@example.com",
+  "team@example.com"
+]
+
+# Optional: SMS notifications (E.164 format)
+notification_phones = [
+  # "+15551234567"
+]
+
+# Feature Flags
+enable_sqs_queue    = false  # Set to true for event queue
+enable_cloudwatch   = true   # CloudWatch monitoring
+enable_s3_storage   = false  # S3 for image storage
+
+# Retention Settings
+log_retention_days   = 7     # CloudWatch logs
+image_retention_days = 30    # S3 images (if enabled)
+
+# Additional Tags
+tags = {
+  CostCenter = "UFABC-Research"
+  Team       = "Computer-Vision"
+}

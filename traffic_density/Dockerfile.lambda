@@ -1,0 +1,182 @@
+# Lambda-optimized Dockerfile for Traffic Detection
+# Based on AWS Lambda Runtime Interface for custom runtimes
+
+FROM public.ecr.aws/lambda/provided:al2023 as builder
+
+# Install build dependencies
+# IMPORTANT: Do NOT install full curl on AL2023 (curl-minimal is default)
+RUN dnf install -y \
+    libcurl-devel \
+    gcc-c++ \
+    cmake \
+    make \
+    wget \
+    unzip \
+    git \
+    tar \
+    pkgconfig \
+    python3 \
+    python3-pip \
+    libjpeg-turbo-devel \
+    libpng-devel \
+    libtiff-devel \
+    zlib-devel \
+    openssl-devel \
+    jq \
+    && dnf clean all
+
+# Build and install OpenCV from source (minimal build for YOLO)
+WORKDIR /tmp
+RUN wget -q https://github.com/opencv/opencv/archive/4.8.0.tar.gz && \
+    tar -xzf 4.8.0.tar.gz && \
+    cd opencv-4.8.0 && \
+    mkdir build && cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=MinSizeRel \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_PERF_TESTS=OFF \
+        -DBUILD_DOCS=OFF \
+        -DBUILD_opencv_apps=OFF \
+        -DBUILD_opencv_python2=OFF \
+        -DBUILD_opencv_python3=OFF \
+        -DBUILD_opencv_java=OFF \
+        -DWITH_GTK=OFF \
+        -DWITH_QT=OFF \
+        -DWITH_OPENGL=OFF \
+        -DWITH_VTK=OFF \
+        -DWITH_CUDA=OFF \
+        -DWITH_IPP=OFF \
+        -DWITH_EIGEN=OFF \
+        -DWITH_TBB=OFF \
+        -DWITH_FFMPEG=OFF \
+        -DWITH_GSTREAMER=OFF \
+        -DWITH_V4L=OFF \
+        -DENABLE_PRECOMPILED_HEADERS=ON \
+        -DBUILD_LIST=core,imgproc,imgcodecs,dnn && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && rm -rf opencv-4.8.0 4.8.0.tar.gz
+
+# Install nlohmann-json (header-only)
+RUN wget -q https://github.com/nlohmann/json/releases/download/v3.11.2/json.hpp && \
+    mkdir -p /usr/local/include/nlohmann && \
+    mv json.hpp /usr/local/include/nlohmann/
+
+# Install AWS SDK for C++ (SNS only)
+WORKDIR /tmp
+RUN git clone --depth 1 --recurse-submodules https://github.com/aws/aws-sdk-cpp && \
+    cd aws-sdk-cpp && \
+    mkdir build && cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_ONLY="sns" \
+        -DBUILD_SHARED_LIBS=ON \
+        -DENABLE_TESTING=OFF \
+        -DAUTORUN_UNIT_TESTS=OFF \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCPP_STANDARD=17 \
+        -DENABLE_UNITY_BUILD=ON && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && rm -rf aws-sdk-cpp
+
+# Copy source code
+WORKDIR /app
+COPY traffic_density/CMakeLists.txt ./
+COPY traffic_density/main.cpp ./
+COPY traffic_density/include ./include/
+COPY traffic_density/src ./src/
+COPY traffic_density/utils ./utils/
+
+# Build the application
+RUN mkdir -p build && cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_AWS_SNS=ON \
+        -DCMAKE_INSTALL_PREFIX=/opt && \
+    make -j$(nproc)
+
+# Download YOLO models
+RUN mkdir -p /app/resources/models && \
+    cd /app/resources/models && \
+    wget -q https://pjreddie.com/media/files/yolov3.weights && \
+    wget -q https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3.cfg
+
+# ================================
+# Final runtime stage
+# ================================
+FROM public.ecr.aws/lambda/provided:al2023
+
+# Install minimal runtime dependencies
+# curl-minimal is already present — DO NOT replace it
+RUN dnf install -y \
+    libjpeg-turbo \
+    libpng \
+    libtiff \
+    zlib \
+    openssl \
+    ca-certificates \
+    jq \
+    && dnf clean all
+
+# Copy OpenCV runtime libraries
+COPY --from=builder /usr/local/lib64/libopencv_core.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libopencv_imgproc.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libopencv_imgcodecs.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libopencv_dnn.so* /usr/local/lib64/
+
+# Copy AWS SDK libraries
+COPY --from=builder /usr/local/lib64/libaws-cpp-sdk-sns.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libaws-cpp-sdk-core.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libaws-crt-cpp.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libaws-c-*.so* /usr/local/lib64/
+
+# Update linker cache
+RUN ldconfig /usr/local/lib64
+
+# Copy compiled binary
+COPY --from=builder /app/build/main_exec /opt/traffic_detector
+
+# Strip symbols
+RUN strip /opt/traffic_detector /usr/local/lib64/*.so* 2>/dev/null || true
+
+# Copy YOLO models
+COPY --from=builder /app/resources/models /opt/resources/models
+
+# Lambda bootstrap
+RUN cat > /var/runtime/bootstrap <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+LAMBDA_RUNTIME_API="${AWS_LAMBDA_RUNTIME_API}"
+
+while true; do
+  HEADERS=$(mktemp)
+  EVENT_DATA=$(curl -sS -LD "$HEADERS" \
+    "http://${LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next")
+
+  REQUEST_ID=$(grep -Fi Lambda-Runtime-Aws-Request-Id "$HEADERS" | cut -d: -f2 | tr -d '[:space:]')
+
+  AVENUE_NAME=$(echo "$EVENT_DATA" | jq -r '.avenue_name // "Avenida dos Estados"')
+  MODE=$(echo "$EVENT_DATA" | jq -r '.mode // "production"')
+
+  echo "Processing request $REQUEST_ID ($AVENUE_NAME)"
+
+  RESPONSE=$(/opt/traffic_detector "$MODE" 2>&1 || echo '{"error":"processing failed"}')
+
+  curl -sS -X POST \
+    "http://${LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response" \
+    -d "$RESPONSE" || \
+  curl -sS -X POST \
+    "http://${LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/error" \
+    -d "$(echo "$RESPONSE" | jq -Rs '{errorMessage: ., errorType: "ExecutionError"}')"
+done
+EOF
+
+RUN chmod +x /var/runtime/bootstrap
+
+WORKDIR /opt
+CMD ["function.handler"]
