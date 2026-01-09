@@ -72,7 +72,10 @@ main() {
     # Step 2: Build Docker image
     log_info "Building Docker image for Lambda..."
     cd ..
-    docker build -t "${PROJECT_NAME}-lambda:latest" -f traffic_density/Dockerfile.lambda .
+    
+    # the parameter provenance is added to fix this issue https://stackoverflow.com/questions/65608802/cant-deploy-container-image-to-lambda-function
+
+    docker build -t  "${PROJECT_NAME}-lambda:latest" -f traffic_density/Dockerfile.lambda . --provenance=false
     
     # Step 3: Tag image
     log_info "Tagging Docker image..."

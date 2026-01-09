@@ -6,22 +6,25 @@ set(CMAKE_CXX_STANDARD 17)
 # Option to enable AWS SNS support
 option(ENABLE_AWS_SNS "Enable AWS SNS notifications" OFF)
 
+# Option to enable GUI (highgui) - disable for Lambda
+option(ENABLE_GUI "Enable OpenCV highgui for GUI display" ON)
+
 # =======================
 # Find Dependencies
 # =======================
 
-# OpenCV
-find_package(OpenCV REQUIRED core highgui imgproc dnn)
-find_package(HDF5 REQUIRED)
+# OpenCV - highgui only needed for local development with GUI
+if(ENABLE_GUI)
+    find_package(OpenCV REQUIRED core highgui imgproc dnn videoio)
+    find_package(HDF5 REQUIRED)
+    find_package(VTK REQUIRED)
+    find_package(OpenGL REQUIRED)
+else()
+    find_package(OpenCV REQUIRED core imgproc imgcodecs dnn videoio)
+endif()
 
-# Find VTK (no longer using deprecated VTK_USE_FILE)
-find_package(VTK REQUIRED)
-
-# Find OpenGL
-find_package(OpenGL REQUIRED)
-
-# nlohmann_json
-find_package(nlohmann_json REQUIRED)
+# nlohmann_json - header-only library (no find_package needed)
+# Just ensure /usr/local/include is in include path
 
 # AWS SDK (optional)
 if(ENABLE_AWS_SNS)
@@ -33,11 +36,20 @@ endif()
 # =======================
 # Include Directories
 # =======================
-include_directories(
-    ${OpenCV_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIRS}    # Added HDF5 headers
-    include
-)
+if(ENABLE_GUI)
+    include_directories(
+        ${OpenCV_INCLUDE_DIRS}
+        ${HDF5_INCLUDE_DIRS}
+        /usr/local/include
+        include
+    )
+else()
+    include_directories(
+        ${OpenCV_INCLUDE_DIRS}
+        /usr/local/include
+        include
+    )
+endif()
 
 # =======================
 # Main Executable
@@ -52,14 +64,19 @@ add_executable(main_exec
 # =======================
 # Link Libraries
 # =======================
-target_link_libraries(main_exec
-    ${OpenCV_LIBS}          # OpenCV core libraries
-    nlohmann_json::nlohmann_json
-    ${HDF5_LIBRARIES}       # Added HDF5 libraries
-    ${VTK_LIBRARIES}        # VTK libraries required for OpenCV viz
-    OpenGL::GL
-    OpenGL::GLU
-)
+if(ENABLE_GUI)
+    target_link_libraries(main_exec
+        ${OpenCV_LIBS}
+        ${HDF5_LIBRARIES}
+        ${VTK_LIBRARIES}
+        OpenGL::GL
+        OpenGL::GLU
+    )
+else()
+    target_link_libraries(main_exec
+        ${OpenCV_LIBS}
+    )
+endif()
 
 # Link AWS SDK if enabled
 if(ENABLE_AWS_SNS)

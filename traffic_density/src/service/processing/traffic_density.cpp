@@ -1,5 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
+#include "gui_compat.hpp"
 #include <iostream>
 #include <vector>
 #include <set>
@@ -204,15 +205,19 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
                 Scalar(0, 255, 0), 2);
     }
 
-    static bool windowInitialized = false;
-    if (!windowInitialized) {
-        namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
-        resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
-        windowInitialized = true;
+    // Only show GUI in local environment
+    const char* env = std::getenv("ENVIRONMENT");
+    if (env && std::string(env) == "local") {
+        static bool windowInitialized = false;
+        if (!windowInitialized) {
+            namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
+            resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
+            windowInitialized = true;
+        }
+        
+        imshow("YOLO Vehicle Detection + Density", image);
+        waitKey(1);   // non-blocking; window stays open
     }
-
-    imshow("YOLO Vehicle Detection + Density", image);
-    waitKey(1);   // non-blocking; window stays open
 
     return report;
 

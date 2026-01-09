@@ -55,7 +55,7 @@ RUN wget -q https://github.com/opencv/opencv/archive/4.8.0.tar.gz && \
         -DWITH_GSTREAMER=OFF \
         -DWITH_V4L=OFF \
         -DENABLE_PRECOMPILED_HEADERS=ON \
-        -DBUILD_LIST=core,imgproc,imgcodecs,dnn && \
+        -DBUILD_LIST=core,imgproc,imgcodecs,dnn,videoio && \
     make -j$(nproc) && \
     make install && \
     cd /tmp && rm -rf opencv-4.8.0 4.8.0.tar.gz
@@ -96,6 +96,7 @@ RUN mkdir -p build && cd build && \
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
         -DENABLE_AWS_SNS=ON \
+        -DENABLE_GUI=OFF \
         -DCMAKE_INSTALL_PREFIX=/opt && \
     make -j$(nproc)
 
@@ -127,15 +128,16 @@ COPY --from=builder /usr/local/lib64/libopencv_core.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libopencv_imgproc.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libopencv_imgcodecs.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libopencv_dnn.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libopencv_videoio.so* /usr/local/lib64/
 
 # Copy AWS SDK libraries
 COPY --from=builder /usr/local/lib64/libaws-cpp-sdk-sns.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libaws-cpp-sdk-core.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libaws-crt-cpp.so* /usr/local/lib64/
 COPY --from=builder /usr/local/lib64/libaws-c-*.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libs2n.so* /usr/local/lib64/
+COPY --from=builder /usr/local/lib64/libaws-checksums.so* /usr/local/lib64/
 
-# Update linker cache
-RUN ldconfig /usr/local/lib64
 
 # Copy compiled binary
 COPY --from=builder /app/build/main_exec /opt/traffic_detector
@@ -178,5 +180,10 @@ EOF
 
 RUN chmod +x /var/runtime/bootstrap
 
+# Set library path for runtime
+ENV LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH
+
 WORKDIR /opt
-CMD ["function.handler"]
+
+# Dummy handler for AWS Lambda entrypoint (actual execution is in bootstrap)
+CMD [ "bootstrap" ]

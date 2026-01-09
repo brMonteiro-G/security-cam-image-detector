@@ -416,11 +416,14 @@ resource "aws_lambda_function" "traffic_detector" {
   
   # Container image configuration
   package_type = "Image"
-  image_uri    = "${aws_ecr_repository.traffic_detector[0].repository_url}:latest"
+  image_uri    = "222634361357.dkr.ecr.us-east-1.amazonaws.com/security-cam-detector-lambda-dev:latest"
   
   # Resource configuration
   memory_size = var.lambda_memory_size
   timeout     = var.lambda_timeout
+  
+  # Architecture - use ARM64 for better performance and lower cost
+  architectures = ["arm64"]
   
   ephemeral_storage {
     size = var.lambda_ephemeral_storage
