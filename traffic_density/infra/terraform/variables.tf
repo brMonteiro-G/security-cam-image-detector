@@ -119,7 +119,7 @@ variable "lambda_timeout" {
 variable "lambda_schedule_expression" {
   description = "EventBridge schedule expression for Lambda execution (e.g., 'rate(5 minutes)' or 'cron(0 * * * ? *)')"
   type        = string
-  default     = "rate(10 minutes)"
+  default     = "cron(0 6,8,12,18,20 * * ? *)"
 }
 
 variable "camera_stream_url" {
@@ -137,4 +137,23 @@ variable "lambda_ephemeral_storage" {
     condition     = var.lambda_ephemeral_storage >= 512 && var.lambda_ephemeral_storage <= 10240
     error_message = "Lambda ephemeral storage must be between 512 and 10240 MB."
   }
+}
+
+# VPC Configuration
+variable "enable_lambda_vpc" {
+  description = "Enable VPC for Lambda (required for accessing external URLs like camera streams)"
+  type        = bool
+  default     = true
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "enable_vpc_endpoints" {
+  description = "Enable VPC endpoints for AWS services (reduces NAT Gateway costs)"
+  type        = bool
+  default     = true
 }

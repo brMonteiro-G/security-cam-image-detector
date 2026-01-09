@@ -106,6 +106,9 @@ RUN mkdir -p /app/resources/models && \
     wget -q https://pjreddie.com/media/files/yolov3.weights && \
     wget -q https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3.cfg
 
+# Copy demo images for testing
+COPY traffic_density/resources/images/demo /app/resources/images/demo
+
 # ================================
 # Final runtime stage
 # ================================
@@ -147,6 +150,9 @@ RUN strip /opt/traffic_detector /usr/local/lib64/*.so* 2>/dev/null || true
 
 # Copy YOLO models
 COPY --from=builder /app/resources/models /opt/resources/models
+
+# Copy demo images
+COPY --from=builder /app/resources/images/demo /opt/resources/images/demo
 
 # Lambda bootstrap
 RUN cat > /var/runtime/bootstrap <<'EOF'

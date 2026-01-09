@@ -429,6 +429,15 @@ resource "aws_lambda_function" "traffic_detector" {
     size = var.lambda_ephemeral_storage
   }
   
+  # VPC Configuration (enables external URL access via NAT Gateway)
+  dynamic "vpc_config" {
+    for_each = var.enable_lambda_vpc ? [1] : []
+    content {
+      subnet_ids         = aws_subnet.private[*].id
+      security_group_ids = [aws_security_group.lambda_sg[0].id]
+    }
+  }
+  
   # Environment variables
   environment {
     variables = {
@@ -454,6 +463,12 @@ resource "aws_lambda_function" "traffic_detector" {
   lifecycle {
     ignore_changes = [image_uri]
   }
+  
+  # Ensure VPC resources are created first
+  depends_on = [
+    aws_nat_gateway.main,
+    aws_route_table_association.private
+  ]
 }
 
 # CloudWatch Log Group for Lambda

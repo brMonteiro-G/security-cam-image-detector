@@ -6,8 +6,10 @@
 #include <iostream>
 #include <filesystem>
 #include <chrono>
+#include <thread>
 #include <utility>
 #include <string>
+#include <cstdlib>
 
 
 std::pair<std::string, std::string> ingest_camera() {
@@ -28,11 +30,33 @@ std::pair<std::string, std::string> ingest_camera() {
 
     std::filesystem::create_directories(output_dir);
 
-    cv::VideoCapture cap(url);
-    if (!cap.isOpened()) {
-        std::cerr << "Error: Unable to open stream\n";
-        return {avenue_name, ""};
+    // Quick network reachability check to avoid blocking VideoCapture on unreachable URLs
+    // Use curl to perform a HEAD request with a short timeout. If curl is not available
+    // in an environment, this will return non-zero and we will skip opening the stream.
+    {
+        std::string headCmd = "curl -sS --max-time 5 -I '" + url + "' > /dev/null 2>&1";
+        int rc = std::system(headCmd.c_str());
+        if (rc != 0) {
+            std::cerr << "Error: Unable to reach camera URL (curl check failed)\n";
+            return {avenue_name, ""};
+        }
     }
+
+        std::cout << "[INGEST] Attempting to open camera stream: " << url << "\n";
+        cv::VideoCapture cap;
+        // Try to open the stream with a short retry loop so we fail fast in Lambda
+        const int max_open_attempts = 5;
+        int attempt = 0;
+        while (attempt < max_open_attempts) {
+            if (cap.open(url)) break;
+            attempt++;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        if (!cap.isOpened()) {
+            std::cerr << "[INGEST ERROR] Unable to open stream after " << max_open_attempts << " attempts\n";
+            return {avenue_name, ""};
+        }
 
     cv::Mat frame;
 
@@ -51,11 +75,18 @@ std::pair<std::string, std::string> ingest_camera() {
         }
         
         while (true) {
-            cap >> frame;
-            if (frame.empty()) {
-                std::cerr << "Error: Empty frame\n";
-                break;
-            }
+                // Read with timeout/retries to avoid blocking indefinitely
+                bool gotFrame = false;
+                const int max_frame_attempts = 5;
+                for (int i = 0; i < max_frame_attempts; ++i) {
+                    cap >> frame;
+                    if (!frame.empty()) { gotFrame = true; break; }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                }
+                if (!gotFrame) {
+                    std::cerr << "[INGEST ERROR] Empty frame after retries\n";
+                    break;
+                }
 
             if (isLocal) {
                 cv::Mat displayFrame;
