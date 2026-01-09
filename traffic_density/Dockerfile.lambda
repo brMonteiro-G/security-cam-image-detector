@@ -1,7 +1,7 @@
 # Lambda-optimized Dockerfile for Traffic Detection
 # Based on AWS Lambda Runtime Interface for custom runtimes
 
-FROM public.ecr.aws/lambda/provided:al2023 as builder
+FROM public.ecr.aws/lambda/provided:al2023 AS builder
 
 # Install build dependencies
 # IMPORTANT: Do NOT install full curl on AL2023 (curl-minimal is default)
