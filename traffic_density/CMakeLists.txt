@@ -3,6 +3,9 @@ project(TrafficDensity)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Option to enable AWS SNS support
+option(ENABLE_AWS_SNS "Enable AWS SNS notifications" OFF)
+
 # =======================
 # Find Dependencies
 # =======================
@@ -19,6 +22,13 @@ find_package(OpenGL REQUIRED)
 
 # nlohmann_json
 find_package(nlohmann_json REQUIRED)
+
+# AWS SDK (optional)
+if(ENABLE_AWS_SNS)
+    find_package(AWSSDK REQUIRED COMPONENTS sns core)
+    add_definitions(-DUSE_AWS_SNS)
+    message(STATUS "AWS SNS support enabled")
+endif()
 
 # =======================
 # Include Directories
@@ -50,3 +60,8 @@ target_link_libraries(main_exec
     OpenGL::GL
     OpenGL::GLU
 )
+
+# Link AWS SDK if enabled
+if(ENABLE_AWS_SNS)
+    target_link_libraries(main_exec ${AWSSDK_LINK_LIBRARIES})
+endif()
