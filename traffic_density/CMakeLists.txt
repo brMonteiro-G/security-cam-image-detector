@@ -11,11 +11,11 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(OpenCV REQUIRED core highgui imgproc dnn)
 find_package(HDF5 REQUIRED)
 
-# Find VTK
+# Find VTK (no longer using deprecated VTK_USE_FILE)
 find_package(VTK REQUIRED)
-if(VTK_FOUND)
-    include(${VTK_USE_FILE})
-endif()
+
+# Find OpenGL
+find_package(OpenGL REQUIRED)
 
 # nlohmann_json
 find_package(nlohmann_json REQUIRED)
@@ -47,4 +47,6 @@ target_link_libraries(main_exec
     nlohmann_json::nlohmann_json
     ${HDF5_LIBRARIES}       # Added HDF5 libraries
     ${VTK_LIBRARIES}        # VTK libraries required for OpenCV viz
+    OpenGL::GL
+    OpenGL::GLU
 )

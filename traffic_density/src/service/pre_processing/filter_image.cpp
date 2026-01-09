@@ -1,3 +1,40 @@
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <iostream>
+#include <chrono>
+#include <sstream>
+#include <filesystem>
+#include <string>
+
+using namespace cv;
+using namespace std;
+
+// Helper function: Apply CLAHE to HSV
+Mat apply_clahe_hsv(const Mat& frame) {
+    Mat hsv;
+    cvtColor(frame, hsv, COLOR_BGR2HSV);
+    
+    vector<Mat> channels;
+    split(hsv, channels);
+    
+    Ptr<CLAHE> clahe = createCLAHE(2.0, Size(8, 8));
+    clahe->apply(channels[2], channels[2]);
+    
+    merge(channels, hsv);
+    
+    Mat result;
+    cvtColor(hsv, result, COLOR_HSV2BGR);
+    return result;
+}
+
+// Helper function: Apply bilateral filter
+Mat apply_bilateral_filter(const Mat& frame) {
+    Mat result;
+    bilateralFilter(frame, result, 9, 75, 75);
+    return result;
+}
+
 // Update preprocess_static to accept avenue_name
 std::string preprocess_static(const Mat& frame, const std::string& avenue_name) {
     Mat result = apply_clahe_hsv(frame);

@@ -17,22 +17,22 @@ std::string test_static_image(const std::string& imagePath, const std::string& a
 // Image capture
 std::pair<std::string, std::string> ingest_camera();
 
-int main() {
-	auto [avenueName, imagePath] = ingest_camera();
-    printf("Avenue: %s\nImage Path: %s\n", avenueName.c_str(), imagePath.c_str());
+// int main() {
+// 	auto [avenueName, imagePath] = ingest_camera();
+//     printf("Avenue: %s\nImage Path: %s\n", avenueName.c_str(), imagePath.c_str());
     
-    std::string processedImagePath = test_static_image(imagePath, avenueName);
+//     std::string processedImagePath = test_static_image(imagePath, avenueName);
 
-    printf("Processed Image Path: %s\n", processedImagePath.c_str());
+//     printf("Processed Image Path: %s\n", processedImagePath.c_str());
     
-    std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
+//     std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
 
-    // sendTrafficNotification(
-    // avenueName,
-    // report,
-    // );
+//     // sendTrafficNotification(
+//     // avenueName,
+//     // report,
+//     // );
 
-}
+// }
 
 // ----------------------------------------------------
 // LIVE version of image_capture
@@ -52,7 +52,7 @@ bool userRequestedExit() {
 
 // ----------------------------------------------------
 // Forward declaration (to be implemented in traffic_density.cpp)
-std::string analyzeTrafficDensity(const std::string& imagePath);
+std::string analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
 
 // ----------------------------------------------------
 
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     if (mode == "demo") {
         std::cout << "Entering demo mode. Press ENTER at any time to stop.\n";
         while (true) {
-            auto [avenueName, imagePath] = image_capture_demo();
+            auto [avenueName, imagePath] = image_capture_live();
 
             if (imagePath.empty()) {
                 std::cout << "No demo images. Exiting demo mode.\n";
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
             }
 
             std::string processedImagePath = test_static_image(imagePath, avenueName);
-            std::string report = analyzeTrafficDensity(processedImagePath);
+            std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
 
             sendTrafficNotification(
                 avenueName,
@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            std::string report = analyzeTrafficDensity(analysisPath);
+            std::string report = analyzeTrafficDensity(analysisPath, avenueName);
 
             if (shouldReport && !report.empty()) {
                 sendTrafficNotification(

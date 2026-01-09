@@ -74,13 +74,9 @@ string getTimestamp() {
     return ss.str();
 }
 
-
-namespace {
-struct YoloContext {
-    Net net;
-    vector<String> outputLayers;
-};
-
+// =================================================================
+// === Main Analysis Function ===
+// =================================================================
 string analyzeTrafficDensity(const string& imagePath, const std::string& avenueName){
 
     printf("Starting traffic density analysis...\n");
@@ -120,27 +116,18 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
 
     printf("Model loaded successfully.\n");
 
-        vector<String> layerNames = ctx.net.getLayerNames();
-        vector<int> outLayers = ctx.net.getUnconnectedOutLayers();
-        ctx.outputLayers.reserve(outLayers.size());
-        for (int idx : outLayers) {
-            ctx.outputLayers.push_back(layerNames[idx - 1]);
-        }
-    });
-    return ctx;
-}
+    // Get output layer names
+    vector<String> layerNames = net.getLayerNames();
+    vector<int> outLayers = net.getUnconnectedOutLayers();
+    vector<String> outputLayers;
+    outputLayers.reserve(outLayers.size());
+    for (int idx : outLayers) {
+        outputLayers.push_back(layerNames[idx - 1]);
+    }
 
-const set<int>& vehicleClassIds() {
-    static const set<int> ids = {2, 3, 5, 7};
-    return ids;
-}
-} // namespace
+    // Vehicle class IDs from COCO dataset
+    static const set<int> vehicleIds = {2, 3, 5, 7}; // car, motorbike, bus, truck
 
-// =================================================================
-// === NEW FUNCTION: runDetection() — your old main() code goes here ===
-// =================================================================
-string analyzeTrafficDensity(const string& imagePath)
-{
     // Load image
     Mat image = imread(imagePath);
     if (image.empty()) {
@@ -157,10 +144,10 @@ string analyzeTrafficDensity(const string& imagePath)
     Mat blob;
     blobFromImage(image, blob, 0.00392, Size(416, 416),
                   Scalar(0, 0, 0), true, false);
-    ctx.net.setInput(blob);
+    net.setInput(blob);
 
     vector<Mat> outs;
-    ctx.net.forward(outs, ctx.outputLayers);
+    net.forward(outs, outputLayers);
 
     vector<int> classIds;
     vector<float> confidences;
@@ -227,6 +214,6 @@ string analyzeTrafficDensity(const string& imagePath)
     imshow("YOLO Vehicle Detection + Density", image);
     waitKey(1);   // non-blocking; window stays open
 
-    return {report};
+    return report;
 
 }
