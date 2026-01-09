@@ -1,0 +1,26 @@
+# Terraform Backend Configuration (Optional)
+# Uncomment and configure for remote state storage
+
+# Option 1: S3 Backend (Recommended for team collaboration)
+# terraform {
+#   backend "s3" {
+#     bucket         = "your-terraform-state-bucket"
+#     key            = "security-cam-detector/terraform.tfstate"
+#     region         = "us-east-1"
+#     encrypt        = true
+#     dynamodb_table = "terraform-state-lock"
+#   }
+# }
+
+# Option 2: Terraform Cloud
+# terraform {
+#   cloud {
+#     organization = "your-org"
+#     workspaces {
+#       name = "security-cam-detector-dev"
+#     }
+#   }
+# }
+
+# Option 3: Local Backend (Default - for testing)
+# No configuration needed, state stored in terraform.tfstate locally

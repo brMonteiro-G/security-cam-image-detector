@@ -1,6 +1,6 @@
 #include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include "gui_compat.hpp"
 #include <iostream>
 #include <chrono>
 #include <sstream>
@@ -42,7 +42,12 @@ std::string preprocess_static(const Mat& frame, const std::string& avenue_name) 
     // result = apply_roi(result); // Uncomment if ROI is needed
 
     long timestamp = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    string output_dir = "./resources/images/";
+    
+    // Use /tmp in Lambda (ENVIRONMENT != "local"), otherwise use local path
+    const char* env = std::getenv("ENVIRONMENT");
+    bool isLocal = (env && std::string(env) == "local");
+    string output_dir = isLocal ? "./resources/images/" : "/tmp/";
+    
     filesystem::create_directories(output_dir);
 
     ostringstream filename;
@@ -69,11 +74,15 @@ std::string test_static_image(const std::string& image_path, const std::string& 
     }
     std::string processed_path = preprocess_static(frame, avenue_name);
 
-    // Side-by-side display
-    Mat processed = imread(processed_path);
-    Mat combined;
-    hconcat(frame, processed, combined);
-    imshow("Original | Processed", combined);
+    // Only show GUI in local environment
+    const char* env = std::getenv("ENVIRONMENT");
+    if (env && std::string(env) == "local") {
+        // Side-by-side display
+        Mat processed = imread(processed_path);
+        Mat combined;
+        hconcat(frame, processed, combined);
+        imshow("Original | Processed", combined);
+    }
 
     return processed_path;
 }

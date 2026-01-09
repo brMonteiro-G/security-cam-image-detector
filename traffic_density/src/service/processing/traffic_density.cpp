@@ -1,5 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
+#include "gui_compat.hpp"
 #include <iostream>
 #include <vector>
 #include <set>
@@ -81,15 +82,19 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
 
     printf("Starting traffic density analysis...\n");
 
-    // Use consistent paths for model files
-    string weightsPath = "../resources/models/yolov3.weights";
-    string configPath = "../resources/models/yolov3.cfg";
+    // Check environment to determine model paths
+    const char* env = std::getenv("ENVIRONMENT");
+    bool isLocal = (env && std::string(env) == "local");
+    
+    // Use /opt/resources in Lambda, otherwise use relative path
+    string weightsPath = isLocal ? 
+        "../resources/models/yolov3.weights" : 
+        "/opt/resources/models/yolov3.weights";
+    string configPath = isLocal ? 
+        "../resources/models/yolov3.cfg" : 
+        "/opt/resources/models/yolov3.cfg";
 
-    // Convert to absolute paths to avoid any path resolution issues
-    weightsPath = std::filesystem::absolute(weightsPath).string();
-    configPath = std::filesystem::absolute(configPath).string();
-
-    printf("Absolute paths: weights=%s, config=%s\n", weightsPath.c_str(), configPath.c_str());
+    printf("Model paths: weights=%s, config=%s\n", weightsPath.c_str(), configPath.c_str());
 
     if (!std::filesystem::exists(weightsPath) || !std::filesystem::exists(configPath)) {
         std::cerr << "YOLO model files not found!" << std::endl;
@@ -204,15 +209,19 @@ string analyzeTrafficDensity(const string& imagePath, const std::string& avenueN
                 Scalar(0, 255, 0), 2);
     }
 
-    static bool windowInitialized = false;
-    if (!windowInitialized) {
-        namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
-        resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
-        windowInitialized = true;
+    // Only show GUI in local environment
+    const char* guiEnv = std::getenv("ENVIRONMENT");
+    if (guiEnv && std::string(guiEnv) == "local") {
+        static bool windowInitialized = false;
+        if (!windowInitialized) {
+            namedWindow("YOLO Vehicle Detection + Density", WINDOW_NORMAL);
+            resizeWindow("YOLO Vehicle Detection + Density", 1280, 720);
+            windowInitialized = true;
+        }
+        
+        imshow("YOLO Vehicle Detection + Density", image);
+        waitKey(1);   // non-blocking; window stays open
     }
-
-    imshow("YOLO Vehicle Detection + Density", image);
-    waitKey(1);   // non-blocking; window stays open
 
     return report;
 

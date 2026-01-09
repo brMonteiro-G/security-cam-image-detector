@@ -10,76 +10,62 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
-#include <nlohmann/json.hpp>
 
-// AWS SDK includes
+#include <nlohmann/json.hpp>
 #ifdef USE_AWS_SNS
 #include <aws/core/Aws.h>
 #include <aws/sns/SNSClient.h>
 #include <aws/sns/model/PublishRequest.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
 #endif
 
-// ============================================
-// Load Environment Variables from .env file
-// ============================================
-void loadEnvFile(const std::string& filepath = "../.env") {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        std::cout << "[INFO] .env file not found at: " << filepath << "\n";
-        std::cout << "[INFO] Using system environment variables\n";
+// Load .env file when running in local development (ENVIRONMENT=local).
+// Lines formatted as KEY=VALUE. Existing environment variables are not overwritten.
+void loadEnvFile(const std::string& path) {
+    const char* env = std::getenv("ENVIRONMENT");
+    if (env && std::string(env) != "local") {
+        std::cout << "[ENV] Not local environment, skipping .env load\n";
         return;
     }
 
-    std::cout << "[ENV] Loading environment variables from: " << filepath << "\n";
-    std::string line;
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cout << "[ENV] .env file not found: " << path << "\n";
+        return;
+    }
+
     int count = 0;
-
+    std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        if (line.empty() || line[0] == '#') {
-            continue;
+        // Trim whitespace
+        auto l = line.find_first_not_of(" \t\r\n");
+        if (l == std::string::npos) continue;
+        auto r = line.find_last_not_of(" \t\r\n");
+        std::string trimmed = line.substr(l, r - l + 1);
+        if (trimmed.empty() || trimmed[0] == '#') continue;
+        size_t eq = trimmed.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = trimmed.substr(0, eq);
+        std::string value = trimmed.substr(eq + 1);
+
+        // Remove surrounding quotes from value if present
+        if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') || (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
         }
 
-        // Find the '=' separator
-        size_t pos = line.find('=');
-        if (pos == std::string::npos) {
-            continue;
-        }
-
-        // Extract key and value
-        std::string key = line.substr(0, pos);
-        std::string value = line.substr(pos + 1);
-
-        // Trim whitespace from key
-        key.erase(0, key.find_first_not_of(" \t\r\n"));
-        key.erase(key.find_last_not_of(" \t\r\n") + 1);
-
-        // Trim whitespace and quotes from value
-        value.erase(0, value.find_first_not_of(" \t\r\n"));
-        value.erase(value.find_last_not_of(" \t\r\n") + 1);
-        
-        // Remove surrounding quotes if present
-        if (!value.empty() && value.front() == '"' && value.back() == '"') {
-            value = value.substr(1, value.length() - 2);
-        }
-        if (!value.empty() && value.front() == '\'' && value.back() == '\'') {
-            value = value.substr(1, value.length() - 2);
-        }
-
-        // Set environment variable (only if not already set)
-        if (!std::getenv(key.c_str())) {
-            setenv(key.c_str(), value.c_str(), 1);
-            std::cout << "[ENV] Set " << key << "=" << (key.find("SECRET") != std::string::npos || key.find("KEY") != std::string::npos ? "***" : value) << "\n";
-            count++;
-        } else {
+        // Skip if already set in environment
+        if (std::getenv(key.c_str())) {
             std::cout << "[ENV] Skip " << key << " (already set in environment)\n";
+            continue;
         }
+
+        setenv(key.c_str(), value.c_str(), 0);
+        ++count;
     }
 
     file.close();
     std::cout << "[ENV] Loaded " << count << " environment variables\n";
 }
+
 
 // Forward declaration (to be implemented in traffic_density.cpp)
 std::string analyzeTrafficDensity(const std::string& imagePath, const std::string& avenueName);
@@ -106,6 +92,61 @@ std::pair<std::string, std::string> ingest_camera();
 //     // );
 
 // }
+
+// ----------------------------------------------------
+// DEMO version - uses pre-saved images
+// ----------------------------------------------------
+std::pair<std::string, std::string> image_capture_demo() {
+    static int imageIndex = 0;
+    static std::vector<std::string> demoImages;
+    
+    // Initialize demo images list on first call
+    if (demoImages.empty()) {
+        // Check if we're in Lambda or local environment
+        const char* env = std::getenv("ENVIRONMENT");
+        bool isLocal = (env && std::string(env) == "local");
+        
+        std::string demoDir = isLocal ? 
+            "./resources/images/demo" : 
+            "/opt/resources/images/demo";
+        
+        std::cout << "[DEMO] Looking for demo images in: " << demoDir << "\n";
+        
+        // List all .png and .jpg files in demo directory
+        if (std::filesystem::exists(demoDir)) {
+            for (const auto& entry : std::filesystem::directory_iterator(demoDir)) {
+                if (entry.is_regular_file()) {
+                    std::string ext = entry.path().extension().string();
+                    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                        demoImages.push_back(entry.path().string());
+                        std::cout << "[DEMO] Found image: " << entry.path().filename() << "\n";
+                    }
+                }
+            }
+        } else {
+            std::cerr << "[DEMO ERROR] Demo directory not found: " << demoDir << "\n";
+        }
+        
+        if (demoImages.empty()) {
+            std::cerr << "[DEMO ERROR] No demo images found\n";
+            return {"Avenida dos Estados", ""};
+        }
+        
+        std::cout << "[DEMO] Loaded " << demoImages.size() << " demo images\n";
+    }
+    
+    // Return empty if no images available
+    if (demoImages.empty()) {
+        return {"Avenida dos Estados", ""};
+    }
+    
+    // Cycle through demo images
+    std::string imagePath = demoImages[imageIndex];
+    imageIndex = (imageIndex + 1) % demoImages.size();
+    
+    std::cout << "[DEMO] Using image: " << imagePath << "\n";
+    return {"Avenida dos Estados", imagePath};
+}
 
 // ----------------------------------------------------
 // LIVE version of image_capture
@@ -218,8 +259,15 @@ void sendTrafficNotification(const std::string& avenueName, const std::string& r
     }
 
     try {
-        // Create SNS client
-        Aws::SNS::SNSClient snsClient;
+        // Create SNS client with custom configuration for VPC
+        Aws::Client::ClientConfiguration clientConfig;
+        clientConfig.region = "us-east-1";
+        clientConfig.connectTimeoutMs = 10000;  // 10 seconds
+        clientConfig.requestTimeoutMs = 30000;  // 30 seconds
+        
+        Aws::SNS::SNSClient snsClient(clientConfig);
+        
+        std::cout << "[SNS] Client created with extended timeout\n";
         
         // Prepare message
         std::string subject = "Traffic Alert: " + avenueName;
@@ -285,6 +333,16 @@ int main(int argc, char* argv[]) {
     });
 #endif
 
+    // Debug: print key environment variables so CloudWatch shows them on start
+    const char* env_run = std::getenv("ENVIRONMENT");
+    const char* cam_url = std::getenv("CAMERA_STREAM_URL");
+    const char* sns_arn = std::getenv("AWS_SNS_TOPIC_ARN");
+    const char* s3_bucket = std::getenv("S3_BUCKET_NAME");
+    std::cout << "[STARTUP] ENVIRONMENT=" << (env_run ? env_run : "(unset)")
+              << " CAMERA_STREAM_URL=" << (cam_url ? cam_url : "(unset)")
+              << " AWS_SNS_TOPIC_ARN=" << (sns_arn ? sns_arn : "(unset)")
+              << " S3_BUCKET_NAME=" << (s3_bucket ? s3_bucket : "(unset)") << "\n";
+
     std::string mode;
     if (argc > 1) mode = argv[1];
     else {
@@ -296,14 +354,51 @@ int main(int argc, char* argv[]) {
     // Convert to lowercase
     for (auto &c : mode) c = std::tolower(c);
 
+    // Determine if running locally or in Lambda
+    bool isLocalRun = (env_run && std::string(env_run) == "local");
+
     if (mode == "demo") {
-        std::cout << "Entering demo mode. Press ENTER at any time to stop.\n";
-        while (true) {
-            auto [avenueName, imagePath] = image_capture_live();
+        // Check if running in Lambda (non-local environment)
+        const char* env = std::getenv("ENVIRONMENT");
+        bool isLocal = (env && std::string(env) == "local");
+        
+        if (isLocal) {
+            std::cout << "Entering demo mode. Press ENTER at any time to stop.\n";
+            while (true) {
+                auto [avenueName, imagePath] = image_capture_demo();
+
+                if (imagePath.empty()) {
+                    std::cout << "No demo images. Exiting demo mode.\n";
+                    break;
+                }
+
+                std::string processedImagePath = test_static_image(imagePath, avenueName);
+                std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
+
+                sendTrafficNotification(
+                    avenueName,
+                    report
+                );
+
+                // Wait 5 seconds, exit early if user presses ENTER
+                for (int i = 0; i < 50; ++i) {
+                    if (userRequestedExit()) {
+                        std::string line;
+                        std::getline(std::cin, line); // consume input
+                        std::cout << "Exit requested. Leaving demo mode...\n";
+                        return 0; // or break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+        } else {
+            // In Lambda: process just one image and exit
+            std::cout << "Entering demo mode (Lambda: single execution).\n";
+            auto [avenueName, imagePath] = image_capture_demo();
 
             if (imagePath.empty()) {
-                std::cout << "No demo images. Exiting demo mode.\n";
-                break;
+                std::cout << "No demo images available.\n";
+                return 1;
             }
 
             std::string processedImagePath = test_static_image(imagePath, avenueName);
@@ -313,66 +408,96 @@ int main(int argc, char* argv[]) {
                 avenueName,
                 report
             );
-
-            // Wait 5 seconds, exit early if user presses ENTER
-            for (int i = 0; i < 50; ++i) {
-                if (userRequestedExit()) {
-                    std::string line;
-                    std::getline(std::cin, line); // consume input
-                    std::cout << "Exit requested. Leaving demo mode...\n";
-                    return 0; // or break;
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
+            
+            std::cout << "Demo mode completed successfully.\n";
         }
     }
 
     else if (mode == "live") {
-        std::cout << "Entering live mode. Press ENTER at any time to stop.\n";
-        using clock = std::chrono::steady_clock;
-        auto lastReport = clock::now() - std::chrono::seconds(30);
+        // If running locally, behave interactively. In Lambda/non-local, run a single
+        // capture/process/report cycle and exit to avoid long-running functions.
+        if (isLocalRun) {
+            std::cout << "Entering live mode. Press ENTER at any time to stop.\n";
+            using clock = std::chrono::steady_clock;
+            auto lastReport = clock::now() - std::chrono::seconds(30);
 
-        while (true) {
-            if (userRequestedExit()) {
-                std::string line;
-                std::getline(std::cin, line); // consume input
-                std::cout << "Exit requested. Leaving live mode...\n";
-                return 0;
-            }
-
-            auto [avenueName, imagePath] = image_capture_live();
-            if (imagePath.empty()) {
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                continue;
-            }
-
-            auto now = clock::now();
-            bool shouldReport = (now - lastReport) >= std::chrono::seconds(30);
-
-            std::string analysisPath = imagePath;
-            if (shouldReport) {
-                std::string processedImagePath = test_static_image(imagePath, avenueName);
-                if (!processedImagePath.empty()) {
-                    analysisPath = processedImagePath;
+            while (true) {
+                if (userRequestedExit()) {
+                    std::string line;
+                    std::getline(std::cin, line); // consume input
+                    std::cout << "Exit requested. Leaving live mode...\n";
+                    return 0;
                 }
+
+                std::cout << "[FLOW] live: calling image_capture_live()\n";
+                auto [avenueName, imagePath] = image_capture_live();
+                std::cout << "[FLOW] live: image_capture_live returned path='" << imagePath << "'\n";
+                if (imagePath.empty()) {
+                    std::cout << "[FLOW] live: no image returned, sleeping 1s\n";
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    continue;
+                }
+
+                auto now = clock::now();
+                bool shouldReport = (now - lastReport) >= std::chrono::seconds(30);
+
+                std::string analysisPath = imagePath;
+                if (shouldReport) {
+                    std::cout << "[FLOW] live: preprocessing image: " << imagePath << "\n";
+                    std::string processedImagePath = test_static_image(imagePath, avenueName);
+                    std::cout << "[FLOW] live: preprocessing returned '" << processedImagePath << "'\n";
+                    if (!processedImagePath.empty()) {
+                        analysisPath = processedImagePath;
+                    }
+                }
+
+                std::cout << "[FLOW] live: starting analysis on: " << analysisPath << "\n";
+                std::string report = analyzeTrafficDensity(analysisPath, avenueName);
+                std::cout << "[FLOW] live: analysis report='" << report << "'\n";
+
+                if (shouldReport && !report.empty()) {
+                    std::cout << "[FLOW] live: sending notification\n";
+                    sendTrafficNotification(
+                        avenueName,
+                        report
+                    );
+                    lastReport = now;
+                }
+
+                if (!imagePath.empty()) {
+                    std::error_code ec;
+                    std::filesystem::remove(imagePath, ec);
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        } else {
+            // Lambda: single-run live processing (fetch one frame and report)
+            std::cout << "Entering live mode (Lambda: single execution).\n";
+
+            std::cout << "[FLOW] live(Lambda): calling image_capture_live()\n";
+            auto [avenueName, imagePath] = image_capture_live();
+            std::cout << "[FLOW] live(Lambda): image_capture_live returned path='" << imagePath << "'\n";
+
+            if (imagePath.empty()) {
+                std::cout << "No image captured from live stream.\n";
+                return 1;
             }
 
-            std::string report = analyzeTrafficDensity(analysisPath, avenueName);
+            std::cout << "[FLOW] live(Lambda): preprocessing image: " << imagePath << "\n";
+            std::string processedImagePath = test_static_image(imagePath, avenueName);
+            std::cout << "[FLOW] live(Lambda): preprocessing returned '" << processedImagePath << "'\n";
 
-            if (shouldReport && !report.empty()) {
-                sendTrafficNotification(
-                    avenueName,
-                    report
-                );
-                lastReport = now;
+            std::cout << "[FLOW] live(Lambda): starting analysis on: " << processedImagePath << "\n";
+            std::string report = analyzeTrafficDensity(processedImagePath, avenueName);
+            std::cout << "[FLOW] live(Lambda): analysis report='" << report << "'\n";
+
+            if (!report.empty()) {
+                std::cout << "[FLOW] live(Lambda): sending notification\n";
+                sendTrafficNotification(avenueName, report);
             }
 
-            if (!imagePath.empty()) {
-                std::error_code ec;
-                std::filesystem::remove(imagePath, ec);
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::cout << "Live single-run completed.\n";
         }
     }
     else {
